@@ -236,6 +236,7 @@ export default function App() {
         const pref = foodReminderPrefs[pet.id] || { on: true };
         if (!pref.on) continue;
         for (const m of MEAL_REMINDERS) {
+          if (pref.meals && pref.meals[m.tag] === false) continue;
           const hour = pref.hours?.[m.tag] ?? m.hour;
           const fed = (foodData[pet.id] || []).some(
             (it) => it.tag === m.tag && it.createdAt && isSameDate(new Date(it.createdAt), now)

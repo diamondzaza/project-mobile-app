@@ -1,5 +1,5 @@
 /** หน้า Food */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SafeAreaView, View, TextInput, Pressable, Image, StyleSheet, Switch } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
@@ -73,6 +73,10 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
   const [goalEditing, setGoalEditing] = useState(false);
   const [goalText, setGoalText] = useState("");
 
+  const [mealDraft, setMealDraft] = useState({});
+  const [hourDraft, setHourDraft] = useState(10);
+  const [justSaved, setJustSaved] = useState(false);
+
   const list = items || [];
   const now = new Date();
   const startOfToday = new Date(now);
@@ -125,10 +129,41 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
 
   const reminderOn = foodReminder?.on ?? true;
   const hourOf = (m) => foodReminder?.hours?.[m.tag] ?? m.hour;
+  const mealEnabled = (m, source) => source?.meals?.[m.tag] ?? true;
+
+  const buildMealDraft = () =>
+    Object.fromEntries(CAT.tags.map((t) => [t.tag, mealEnabled(t, foodReminder)]));
+
+  const buildHourDraft = () => {
+    const first = CAT.tags.find((t) => mealEnabled(t, foodReminder));
+    return first ? hourOf(first) : 10;
+  };
+
+  useEffect(() => {
+    setMealDraft(buildMealDraft());
+    setHourDraft(buildHourDraft());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePet?.id, foodReminder?.meals]);
+
+  useEffect(() => {
+    setJustSaved(false);
+  }, [activePet?.id]);
+
+  const mealsDirty =
+    CAT.tags.some((t) => mealDraft[t.tag] !== mealEnabled(t, foodReminder)) ||
+    CAT.tags.some((t) => mealDraft[t.tag] && hourOf(t) !== hourDraft);
+  const showSaved = justSaved && !mealsDirty;
+
+  const saveMeals = () => {
+    const hours = Object.fromEntries(CAT.tags.filter((t) => mealDraft[t.tag]).map((t) => [t.tag, hourDraft]));
+    onSetFoodReminder(activePet.id, { meals: mealDraft, hours });
+    setJustSaved(true);
+  };
 
   const missingMeals = reminderOn
     ? CAT.tags.filter(
         (m) =>
+          mealEnabled(m, foodReminder) &&
           now.getHours() >= hourOf(m) &&
           !list.some((it) => it.tag === m.tag && it.createdAt && new Date(it.createdAt) >= startOfToday)
       )
@@ -364,37 +399,63 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                     accessibilityLabel="เปิด/ปิดแจ้งเตือนการให้อาหาร"
                   />
                 </View>
-                {reminderOn &&
-                  CAT.tags.map((m) => {
-                    const h = hourOf(m);
-                    return (
-                      <View key={m.tag} style={styles.mealReminderRow}>
-                        <View style={styles.mealReminderLabel}>
-                          <Feather name={m.icon} size={13} color={CAT.accentDeep} />
-                          <AppText style={styles.mealReminderText}>มื้อ{m.label}</AppText>
-                        </View>
-                        <View style={styles.reminderChips}>
-                          {MEAL_REMINDER_HOUR_OPTIONS.map((oh) => {
-                            const active = h === oh;
-                            return (
-                              <Pressable
-                                key={oh}
-                                onPress={() => onSetFoodReminder(activePet.id, { hours: { [m.tag]: oh } })}
-                                style={[styles.chip, styles.timeChip, active ? styles.chipActive : styles.chipGlass]}
-                                accessibilityRole="button"
-                                accessibilityState={{ selected: active }}
-                                accessibilityLabel={`ตั้งเวลาแจ้งเตือนมื้อ${m.label} ${oh}:00`}
-                              >
-                                <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
-                                  {String(oh).padStart(2, "0")}:00
-                                </AppText>
-                              </Pressable>
-                            );
-                          })}
-                        </View>
-                      </View>
-                    );
-                  })}
+                {reminderOn && (
+                  <>
+                    <AppText style={styles.mealSelectTitle}>เลือกมื้อที่ต้องการแจ้งเตือน</AppText>
+                    <View style={styles.mealSelectRow}>
+                      {CAT.tags.map((m) => {
+                        const active = mealDraft[m.tag];
+                        return (
+                          <Pressable
+                            key={m.tag}
+                            onPress={() => setMealDraft((prev) => ({ ...prev, [m.tag]: !prev[m.tag] }))}
+                            style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
+                            accessibilityLabel={`เลือกแจ้งเตือนมื้อ${m.label}`}
+                          >
+                            <View style={styles.chipInner}>
+                              <Feather name={m.icon} size={13} color={active ? "#FFFFFF" : colors.textDark} />
+                              <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                                {m.label}
+                              </AppText>
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <AppText style={styles.mealSelectTitle}>เวลาแจ้งเตือน (ใช้ทุกมื้อที่เลือก)</AppText>
+                    <View style={styles.mealSelectRow}>
+                      {MEAL_REMINDER_HOUR_OPTIONS.map((oh) => {
+                        const active = hourDraft === oh;
+                        return (
+                          <Pressable
+                            key={oh}
+                            onPress={() => setHourDraft(oh)}
+                            style={[styles.chip, styles.timeChip, active ? styles.chipActive : styles.chipGlass]}
+                            accessibilityRole="button"
+                            accessibilityState={{ selected: active }}
+                            accessibilityLabel={`ตั้งเวลาแจ้งเตือน ${oh}:00`}
+                          >
+                            <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                              {String(oh).padStart(2, "0")}:00
+                            </AppText>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                    <Pressable
+                      onPress={saveMeals}
+                      disabled={!mealsDirty}
+                      style={[styles.saveMealsBtn, !mealsDirty && !showSaved && styles.saveMealsBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel="บันทึกมื้อและเวลาที่เลือก"
+                    >
+                      <Feather name={showSaved ? "check" : "save"} size={15} color="#FFFFFF" />
+                      <AppText style={styles.saveMealsText}>{showSaved ? "บันทึกแล้ว" : "บันทึก"}</AppText>
+                    </Pressable>
+                  </>
+                )}
               </Card>
             </Reveal>
           )}
@@ -547,11 +608,15 @@ const styles = StyleSheet.create({
   reminderCard: { marginHorizontal: 20, marginTop: 14, padding: 14, flexDirection: "row", alignItems: "center" },
   foodReminderCard: { marginHorizontal: 20, marginTop: 14, padding: 14 },
   reminderRowFirst: { marginBottom: 0 },
-  mealReminderRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 10 },
-  mealReminderLabel: { flexDirection: "row", alignItems: "center", gap: 5, width: 78, paddingTop: 6 },
-  mealReminderText: { fontSize: 13, fontWeight: "600", color: colors.textDark },
-  reminderChips: { flex: 1, flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  mealSelectTitle: { fontSize: 13, fontWeight: "600", color: colors.textDark, marginTop: 12 },
+  mealSelectRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 8 },
   timeChip: { paddingHorizontal: 10, paddingVertical: 5 },
+  saveMealsBtn: {
+    flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+    backgroundColor: CAT.accentDeep, borderRadius: 12, paddingVertical: 10, marginTop: 12, ...shadow,
+  },
+  saveMealsBtnDisabled: { opacity: 0.45 },
+  saveMealsText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
   summaryCard: { marginHorizontal: 20, marginTop: 16, padding: 14, flexDirection: "row", alignItems: "center" },
 
   empty: { alignItems: "center", paddingVertical: 50 },
