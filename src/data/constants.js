@@ -33,6 +33,9 @@ export const MEAL_REMINDERS = [
 ];
 
 
+export const MEAL_REMINDER_HOUR_OPTIONS = [6, 8, 10, 12, 14, 16, 18, 20];
+
+
 export const WALK_REMINDER_HOUR_OPTIONS = [8, 12, 17, 18, 20];
 
 

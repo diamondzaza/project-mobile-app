@@ -58,6 +58,8 @@ export default function App() {
   const [activityGoals, setActivityGoals] = useState({});
   
   const [walkReminderPrefs, setWalkReminderPrefs] = useState({});
+
+  const [foodReminderPrefs, setFoodReminderPrefs] = useState({});
   
   const [reminderPrefs, setReminderPrefs] = useState({});
   const setReminderOn = (petId, v) => setReminderPrefs((prev) => ({ ...prev, [petId]: v }));
@@ -98,6 +100,7 @@ export default function App() {
     setFoodGoals(dropKey);
     setActivityGoals(dropKey);
     setWalkReminderPrefs(dropKey);
+    setFoodReminderPrefs(dropKey);
     setReminderPrefs(dropKey);
     setAppointments((prev) => prev.filter((a) => a.petId !== id));
     setNotifications((prev) => prev.filter((n) => n.petId !== id));
@@ -193,6 +196,14 @@ export default function App() {
       ...prev,
       [petId]: { on: true, hour: DEFAULT_WALK_REMINDER_HOUR, ...prev[petId], ...patch },
     }));
+  const setFoodReminder = (petId, patch) =>
+    setFoodReminderPrefs((prev) => {
+      const cur = prev[petId] || { on: true };
+      return {
+        ...prev,
+        [petId]: { ...cur, ...patch, hours: { ...(cur.hours || {}), ...(patch.hours || {}) } },
+      };
+    });
 
   const back = () =>
     setScreenStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : ["home"]));
@@ -222,13 +233,16 @@ export default function App() {
       // สถานะมื้อวันนี้ของทุกสัตว์: id → { fed: ล็อกแล้ว, pastDue: เลยเวลาหรือยัง, title, petId }
       const todayMeals = new Map();
       for (const pet of pets) {
+        const pref = foodReminderPrefs[pet.id] || { on: true };
+        if (!pref.on) continue;
         for (const m of MEAL_REMINDERS) {
+          const hour = pref.hours?.[m.tag] ?? m.hour;
           const fed = (foodData[pet.id] || []).some(
             (it) => it.tag === m.tag && it.createdAt && isSameDate(new Date(it.createdAt), now)
           );
           todayMeals.set(`meal-${pet.id}-${m.tag}-${dateKey}`, {
             fed,
-            pastDue: now.getHours() >= m.hour,
+            pastDue: now.getHours() >= hour,
             title: `ยังไม่ได้บันทึกมื้อ${m.label}ของ ${pet.name}`,
             petId: pet.id,
           });
@@ -255,9 +269,8 @@ export default function App() {
     check();
     const timer = setInterval(check, 60000);
     return () => clearInterval(timer);
-  }, [pets, foodData]);
+  }, [pets, foodData, foodReminderPrefs]);
 
-  
   useEffect(() => {
     const check = () => {
       const now = new Date();
@@ -397,6 +410,8 @@ export default function App() {
           onRemove={foodHandlers.onRemove}
           goal={foodGoals[activePet?.id] ?? DEFAULT_FOOD_GOAL_G}
           onSetGoal={setFoodGoal}
+          foodReminder={foodReminderPrefs[activePet?.id]}
+          onSetFoodReminder={setFoodReminder}
         />
       );
     case "activityLog":

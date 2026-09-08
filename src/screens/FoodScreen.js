@@ -1,6 +1,6 @@
 /** หน้า Food */
 import { useState } from "react";
-import { SafeAreaView, View, TextInput, Pressable, Image, StyleSheet } from "react-native";
+import { SafeAreaView, View, TextInput, Pressable, Image, StyleSheet, Switch } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { Feather } from "@expo/vector-icons";
 import { Soup } from "lucide-react-native";
@@ -11,7 +11,7 @@ import IconButton from "../components/IconButton";
 import ProgressBar from "../components/ProgressBar";
 import { colors, shadow } from "../theme";
 import { isSameDate, timeAgo, formatGregorianShort } from "../utils/date";
-import { MEAL_REMINDERS } from "../data/constants";
+import { MEAL_REMINDERS, MEAL_REMINDER_HOUR_OPTIONS } from "../data/constants";
 import { parseGrams } from "../utils/parse";
 import { takePhoto, choosePhoto } from "../utils/photo";
 import AnimatedScrollView from "../components/AnimatedScrollView";
@@ -61,7 +61,7 @@ const PERIODS = [
   { key: "30d", label: "30 วัน", days: 30 },
 ];
 
-function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSetGoal }) {
+function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSetGoal, foodReminder, onSetFoodReminder }) {
   const [text, setText] = useState("");
   const [activeTag, setActiveTag] = useState(CAT.tags[0].tag);
   const [period, setPeriod] = useState("today");
@@ -123,11 +123,16 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
   };
 
 
-  const missingMeals = CAT.tags.filter(
-    (m) =>
-      now.getHours() >= m.hour &&
-      !list.some((it) => it.tag === m.tag && it.createdAt && new Date(it.createdAt) >= startOfToday)
-  );
+  const reminderOn = foodReminder?.on ?? true;
+  const hourOf = (m) => foodReminder?.hours?.[m.tag] ?? m.hour;
+
+  const missingMeals = reminderOn
+    ? CAT.tags.filter(
+        (m) =>
+          now.getHours() >= hourOf(m) &&
+          !list.some((it) => it.tag === m.tag && it.createdAt && new Date(it.createdAt) >= startOfToday)
+      )
+    : [];
 
   const handleAdd = () => {
     if (!text.trim()) return;
@@ -336,6 +341,64 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
             </Reveal>
           )}
 
+          {onSetFoodReminder && (
+            <Reveal>
+              <Card style={[glassCard, styles.foodReminderCard]}>
+                <View style={[styles.goalRow, styles.reminderRowFirst]}>
+                  <View style={[styles.summaryIcon, { backgroundColor: CAT.soft }]}>
+                    <Feather name="bell" size={18} color={CAT.accentDeep} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <AppText style={styles.summaryLabel}>แจ้งเตือนการให้อาหาร</AppText>
+                    <AppText style={styles.summarySub}>
+                      {reminderOn
+                        ? "แจ้งเตือนเมื่อถึงเวลามื้อแล้วยังไม่ได้บันทึก"
+                        : "ปิดการแจ้งเตือนอยู่"}
+                    </AppText>
+                  </View>
+                  <Switch
+                    value={reminderOn}
+                    onValueChange={(v) => onSetFoodReminder(activePet.id, { on: v })}
+                    trackColor={{ true: CAT.accentDeep, false: "rgba(90,52,25,0.2)" }}
+                    thumbColor="#FFFFFF"
+                    accessibilityLabel="เปิด/ปิดแจ้งเตือนการให้อาหาร"
+                  />
+                </View>
+                {reminderOn &&
+                  CAT.tags.map((m) => {
+                    const h = hourOf(m);
+                    return (
+                      <View key={m.tag} style={styles.mealReminderRow}>
+                        <View style={styles.mealReminderLabel}>
+                          <Feather name={m.icon} size={13} color={CAT.accentDeep} />
+                          <AppText style={styles.mealReminderText}>มื้อ{m.label}</AppText>
+                        </View>
+                        <View style={styles.reminderChips}>
+                          {MEAL_REMINDER_HOUR_OPTIONS.map((oh) => {
+                            const active = h === oh;
+                            return (
+                              <Pressable
+                                key={oh}
+                                onPress={() => onSetFoodReminder(activePet.id, { hours: { [m.tag]: oh } })}
+                                style={[styles.chip, styles.timeChip, active ? styles.chipActive : styles.chipGlass]}
+                                accessibilityRole="button"
+                                accessibilityState={{ selected: active }}
+                                accessibilityLabel={`ตั้งเวลาแจ้งเตือนมื้อ${m.label} ${oh}:00`}
+                              >
+                                <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                                  {String(oh).padStart(2, "0")}:00
+                                </AppText>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    );
+                  })}
+              </Card>
+            </Reveal>
+          )}
+
 
           <View style={styles.chipsRow}>
             {PERIODS.map((p) => {
@@ -482,6 +545,13 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13 },
 
   reminderCard: { marginHorizontal: 20, marginTop: 14, padding: 14, flexDirection: "row", alignItems: "center" },
+  foodReminderCard: { marginHorizontal: 20, marginTop: 14, padding: 14 },
+  reminderRowFirst: { marginBottom: 0 },
+  mealReminderRow: { flexDirection: "row", alignItems: "flex-start", marginTop: 10 },
+  mealReminderLabel: { flexDirection: "row", alignItems: "center", gap: 5, width: 78, paddingTop: 6 },
+  mealReminderText: { fontSize: 13, fontWeight: "600", color: colors.textDark },
+  reminderChips: { flex: 1, flexDirection: "row", gap: 6, flexWrap: "wrap" },
+  timeChip: { paddingHorizontal: 10, paddingVertical: 5 },
   summaryCard: { marginHorizontal: 20, marginTop: 16, padding: 14, flexDirection: "row", alignItems: "center" },
 
   empty: { alignItems: "center", paddingVertical: 50 },

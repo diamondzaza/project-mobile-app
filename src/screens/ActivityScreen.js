@@ -11,8 +11,8 @@ import IconButton from "../components/IconButton";
 import ProgressBar from "../components/ProgressBar";
 import SimpleBarChart from "../calendar/SimpleBarChart";
 import { colors, shadow } from "../theme";
-import { isSameDate, timeAgo, formatGregorianShort } from "../utils/date";
-import { WEEKDAY_LABELS, WALK_REMINDER_HOUR_OPTIONS, DEFAULT_WALK_REMINDER_HOUR } from "../data/constants";
+import { isSameDate, timeAgo, formatGregorianShort, MONTH_ABBR } from "../utils/date";
+import { WEEKDAY_LABELS, MONTH_NAMES, WALK_REMINDER_HOUR_OPTIONS, DEFAULT_WALK_REMINDER_HOUR } from "../data/constants";
 import { parseMinutes, minutesLabel } from "../utils/parse";
 import { confirmDelete } from "../utils/confirm";
 import AnimatedScrollView from "../components/AnimatedScrollView";
@@ -81,6 +81,7 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
   const [text, setText] = useState("");
   const [activeTag, setActiveTag] = useState(CAT.tags[0].key);
   const [chartPeriod, setChartPeriod] = useState("week");
+  const [chartTag, setChartTag] = useState("all");
   const [period, setPeriod] = useState("today");
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
@@ -117,33 +118,44 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
 
 
   const chartData = (() => {
+    // กรองตามหมวดหมู่ที่เลือก ("all" = รวมทุกกิจกรรม)
+    const scoped = chartTag === "all" ? list : list.filter((it) => it.tag === chartTag);
     if (chartPeriod === "week") {
       return Array.from({ length: 7 }, (_, i) => {
         const d = new Date(startOfToday);
         d.setDate(d.getDate() - (6 - i));
-        const value = list
+        const value = scoped
           .filter((it) => it.createdAt && isSameDate(new Date(it.createdAt), d))
           .reduce((sum, it) => sum + minsOf(it), 0);
         return { label: WEEKDAY_LABELS[d.getDay()], value, dateLabel: formatGregorianShort(d) };
       });
     }
 
-    return Array.from({ length: 4 }, (_, i) => {
-      const start = new Date(startOfToday);
-      start.setDate(start.getDate() - (27 - i * 7));
-      const end = new Date(start);
-      end.setDate(end.getDate() + 7);
-      const value = list
+    // โหมดเดือน: แท่งรายเดือน 6 เดือนล่าสุด เรียงจากเก่าไปใหม่
+    return Array.from({ length: 6 }, (_, i) => {
+      const monthsBack = 5 - i;
+      const start = new Date(startOfToday.getFullYear(), startOfToday.getMonth() - monthsBack, 1);
+      const end = new Date(start.getFullYear(), start.getMonth() + 1, 1);
+      const value = scoped
         .filter((it) => it.createdAt && new Date(it.createdAt) >= start && new Date(it.createdAt) < end)
         .reduce((sum, it) => sum + minsOf(it), 0);
-      return { label: formatGregorianShort(start), value, dateLabel: `${formatGregorianShort(start)} – ${formatGregorianShort(new Date(end.getTime() - 1))}` };
+      return {
+        label: MONTH_ABBR[start.getMonth()],
+        value,
+        dateLabel: `${MONTH_NAMES[start.getMonth()]} ${start.getFullYear()}`,
+      };
     });
   })();
-  const chartTodayIndex = chartPeriod === "week" ? 6 : 3;
+  const chartTodayIndex = chartPeriod === "week" ? 6 : 5;
 
   //สถิติตามช่วงกราฟ
   const chartCutoff = new Date(startOfToday);
-  chartCutoff.setDate(chartCutoff.getDate() - (chartPeriod === "week" ? 6 : 27));
+  if (chartPeriod === "week") {
+    chartCutoff.setDate(chartCutoff.getDate() - 6);
+  } else {
+    chartCutoff.setMonth(chartCutoff.getMonth() - 5);
+    chartCutoff.setDate(1);
+  }
   const inPeriod = list.filter((it) => it.createdAt && new Date(it.createdAt) >= chartCutoff);
   const walkCount = inPeriod.filter((it) => it.tag === "Walk").length;
   const playItems = inPeriod.filter((it) => it.tag === "Play");
@@ -355,6 +367,43 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                   );
                 })}
               </View>
+              <AppText style={styles.filterLabel}>หมวดหมู่</AppText>
+              <View style={styles.chipsRowInner}>
+                <Pressable
+                  onPress={() => setChartTag("all")}
+                  style={[styles.chip, chartTag === "all" ? styles.chipActive : styles.chipGlass]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: chartTag === "all" }}
+                  accessibilityLabel="กราฟทุกกิจกรรมรวมกัน"
+                >
+                  <View style={styles.chipInner}>
+                    <Feather name="layers" size={13} color={chartTag === "all" ? "#FFFFFF" : colors.textDark} />
+                    <AppText style={[styles.chipText, { color: chartTag === "all" ? "#FFFFFF" : colors.textDark, fontWeight: chartTag === "all" ? "600" : "400" }]}>
+                      ทั้งหมด
+                    </AppText>
+                  </View>
+                </Pressable>
+                {CAT.tags.map((t) => {
+                  const active = chartTag === t.key;
+                  return (
+                    <Pressable
+                      key={t.key}
+                      onPress={() => setChartTag(t.key)}
+                      style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={`กราฟกิจกรรม: ${t.label}`}
+                    >
+                      <View style={styles.chipInner}>
+                        <t.Icon size={13} color={active ? "#FFFFFF" : colors.textDark} />
+                        <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                          {t.label}
+                        </AppText>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
               <SimpleBarChart data={chartData} accent={CAT.accentDeep} unit=" นาที" todayIndex={chartTodayIndex} />
               <View style={styles.statsRow}>
                 <View style={styles.statBox}>
@@ -552,6 +601,10 @@ const styles = StyleSheet.create({
   sectionLabel: {
     fontSize: 12, fontWeight: "700", color: colors.textBody,
     marginBottom: 8, letterSpacing: 0.3,
+  },
+  filterLabel: {
+    fontSize: 11, fontWeight: "600", color: colors.textBody,
+    marginTop: 10, marginBottom: 6, letterSpacing: 0.3,
   },
 
   goalRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
