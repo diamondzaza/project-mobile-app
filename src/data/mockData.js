@@ -53,8 +53,8 @@ export const initialNotifications = [
 ];
 
 export const initialUser = {
-  name: "Alex Johnson",
-  email: "alex.johnson@example.com",
+  name: "I love Roblox",
+  email: "freefirenumber1@example.com",
   phone: "081-234-5678",
 };
 
