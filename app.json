@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "Pet Care Planner",
+    "slug": "pet-care-planner",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "petcareplanner",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#F5F1E8"
+      }
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-status-bar",
+      "expo-font"
+    ]
+  }
+}

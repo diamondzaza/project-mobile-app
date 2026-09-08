@@ -1,0 +1,76 @@
+/** ปุ่มหลัก **/
+import { Pressable, StyleSheet, Platform } from "react-native";
+
+import { colors, radius, glass } from "../theme";
+import AppText from "./AppText";
+
+
+const VARIANTS = {
+  default: { backgroundColor: "#A8552E", color: "#FFFFFF", borderWidth: 0, glass: false },
+  secondary: { backgroundColor: "rgba(232,196,160,0.42)", color: colors.textDark, borderWidth: 1, glass: true },
+  outline: { backgroundColor: "transparent", color: colors.textDark, borderWidth: 1, glass: true },
+  ghost: { backgroundColor: "transparent", color: colors.textDark, borderWidth: 0, glass: false },
+  destructive: { backgroundColor: "#B23A22", color: "#FFFFFF", borderWidth: 0, glass: false },
+};
+
+const webInset = Platform.select({
+  web: { boxShadow: "0 8px 24px rgba(90,52,25,0.22), inset 0 1px 0 rgba(255,255,255,0.45)" },
+  default: {
+    shadowColor: "#5A3419",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.22,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+});
+
+export default function Button({
+  title,
+  onPress,
+  variant = "default",
+  size = "default",
+  style,
+  textStyle,
+  disabled,
+  iconLeft,
+  iconRight,
+  children,
+  ...props
+}) {
+  const v = VARIANTS[variant] || VARIANTS.default;
+  const heights = { default: 44, sm: 38, lg: 52, icon: 44 };
+  const pads = { default: 16, sm: 12, lg: 20, icon: 0 };
+  const content = children ?? title;
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      style={[
+        styles.base,
+        { height: heights[size] ?? 44, paddingHorizontal: pads[size] ?? 16, backgroundColor: v.backgroundColor, borderWidth: v.borderWidth, borderColor: "rgba(255,255,255,0.55)" },
+        v.glass ? glass.surface : webInset,
+        disabled && { opacity: 0.5 },
+        style,
+      ]}
+      {...props}
+    >
+      {iconLeft}
+      {content != null && (
+        <AppText style={[styles.text, { color: v.color }, iconLeft || iconRight ? { marginHorizontal: 6 } : null, textStyle]}>
+          {content}
+        </AppText>
+      )}
+      {iconRight}
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  base: {
+    borderRadius: radius.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+  },
+  text: { fontSize: 15, fontWeight: "600" },
+});

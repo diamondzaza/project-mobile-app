@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "PowerShell(winget upgrade *)",
+      "Bash(npx expo *)",
+      "Bash(netstat -ano)",
+      "Bash(tasklist *)",
+      "Bash(taskkill *)",
+      "Bash(ipconfig)",
+      "Bash(curl *)"
+    ]
+  }
+}
