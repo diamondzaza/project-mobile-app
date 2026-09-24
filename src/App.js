@@ -7,6 +7,7 @@ import {
   WelcomeScreen,
   LoginScreen,
   RegisterScreen,
+  SetupScreen,
   HomeScreen,
   AddPetScreen,
   PetProfileScreen,
@@ -21,38 +22,41 @@ import {
   UserProfileScreen,
   EditProfileScreen,
 } from "./screens";
-import {
-  initialPets,
-  initialWeightData,
-  initialHealthData,
-  initialAppointments,
-  initialNotifications,
-  initialUser,
-  initialFoodData,
-  initialActivityData,
-  initialNotesData,
-} from "./data";
 import { MEAL_REMINDERS, DEFAULT_FOOD_GOAL_G, DEFAULT_ACTIVITY_GOAL_MIN, DEFAULT_WALK_REMINDER_HOUR } from "./data/constants";
 import { isSameDate } from "./utils/date";
 import { gradient } from "./theme";
+import { supabase, isSupabaseConfigured } from "./lib/supabase";
+import * as authApi from "./lib/auth";
+import * as db from "./lib/db";
+import { uploadPhoto } from "./lib/storage";
+import { uuid } from "./lib/id";
+import { initNotifications, showReminder } from "./lib/notifications";
 
 export default function App() {
-  
+  // ไม่ได้ตั้งค่า .env → แสดงหน้าแนะนำการตั้งค่า (ไม่มีโหมด mock แล้ว)
+  // ครอบเป็น component แยกเพื่อไม่ให้ hook ใน AppInner ถูกเรียกไม่ครบ
+  if (!isSupabaseConfigured) {
+    return <SetupScreen />;
+  }
+  return <AppInner />;
+}
+
+function AppInner() {
   const [screenStack, setScreenStack] = useState(["welcome"]);
   const screen = screenStack[screenStack.length - 1];
 
-  const [pets, setPets] = useState(initialPets);
+  const [pets, setPets] = useState([]);
   const [activePetId, setActivePetId] = useState(null);
   const activePet = pets.find((p) => p.id === activePetId);
 
-  const [weightData, setWeightData] = useState(initialWeightData);
-  const [healthData, setHealthData] = useState(initialHealthData);
-  const [appointments, setAppointments] = useState(initialAppointments);
-  const [notifications, setNotifications] = useState(initialNotifications);
-  const [user, setUser] = useState(initialUser);
-  const [foodData, setFoodData] = useState(initialFoodData);
-  const [activityData, setActivityData] = useState(initialActivityData);
-  const [notesData, setNotesData] = useState(initialNotesData);
+  const [weightData, setWeightData] = useState({});
+  const [healthData, setHealthData] = useState({});
+  const [appointments, setAppointments] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [user, setUser] = useState({ name: "", email: "", phone: "" });
+  const [foodData, setFoodData] = useState({});
+  const [activityData, setActivityData] = useState({});
+  const [notesData, setNotesData] = useState({});
   
   const [foodGoals, setFoodGoals] = useState({});
   const [activityGoals, setActivityGoals] = useState({});
@@ -62,9 +66,150 @@ export default function App() {
   const [foodReminderPrefs, setFoodReminderPrefs] = useState({});
   
   const [reminderPrefs, setReminderPrefs] = useState({});
-  const setReminderOn = (petId, v) => setReminderPrefs((prev) => ({ ...prev, [petId]: v }));
+  const setReminderOn = (petId, v) => {
+    setReminderPrefs((prev) => ({ ...prev, [petId]: v }));
+    if (cloud) {
+      mirror(db.upsertSettings(userId, petId, {
+        ...composeSettings(petId, foodGoals[petId] ?? DEFAULT_FOOD_GOAL_G, activityGoals[petId] ?? DEFAULT_ACTIVITY_GOAL_MIN),
+        vaccineReminder: v,
+      }));
+    }
+  };
 
-  
+  // ---------- cloud (Supabase) ----------
+  const [userId, setUserId] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
+  const authLoadedForRef = useRef(null);
+  /** ใช้ cloud ได้เมื่อตั้งค่า env แล้วและมี session — ไม่งั้นทำงานแบบ mock ในเครื่อง */
+  const cloud = isSupabaseConfigured && userId != null;
+
+  /** เขียนข้อมูลขึ้น DB แบบ fire-and-forget (UI ไม่รอ, error แสดงใน console) */
+  const mirror = (p) => { p?.catch?.((e) => console.warn("[sync]", e?.message || e)); };
+
+  /** วางข้อมูลที่โหลดจาก DB ลง state ทั้งหมด */
+  const applyLoaded = (data) => {
+    setPets(data.pets);
+    setWeightData(data.weightData);
+    setHealthData(data.healthData);
+    setAppointments(data.appointments);
+    setNotifications(data.notifications);
+    setUser(data.user);
+    setFoodData(data.foodData);
+    setActivityData(data.activityData);
+    setNotesData(data.notesData);
+    setFoodGoals(data.foodGoals);
+    setActivityGoals(data.activityGoals);
+    setWalkReminderPrefs(data.walkReminderPrefs);
+    setFoodReminderPrefs(data.foodReminderPrefs);
+    setReminderPrefs(data.reminderPrefs);
+  };
+
+  /** โหลดข้อมูลของ user ลง state — คืน true เมื่อสำเร็จ (false = ลองใหม่ได้) */
+  const handleAuthed = async (uid) => {
+    setUserId(uid);
+    try {
+      applyLoaded(await db.loadAllData(uid));
+      authLoadedForRef.current = uid;
+      setDataLoaded(true);
+      setScreenStack((prev) => {
+        const cur = prev[prev.length - 1];
+        return ["welcome", "login", "register"].includes(cur) ? ["home"] : prev;
+      });
+      // ลงทะเบียนอุปกรณ์ (ไว้รับ push ในอนาคต — ไม่มี token ก็เก็บ platform ไว้)
+      mirror(db.registerDevice(uid));
+      return true;
+    } catch (e) {
+      console.warn("[load]", e?.message || e);
+      return false;
+    } finally {
+      setAuthReady(true);
+    }
+  };
+
+  /** ล้างข้อมูลทั้งหมดตอนออกจากระบบ */
+  const resetData = () => {
+    setPets([]);
+    setWeightData({});
+    setHealthData({});
+    setAppointments([]);
+    setNotifications([]);
+    setUser({ name: "", email: "", phone: "" });
+    setFoodData({});
+    setActivityData({});
+    setNotesData({});
+    setFoodGoals({});
+    setActivityGoals({});
+    setWalkReminderPrefs({});
+    setFoodReminderPrefs({});
+    setReminderPrefs({});
+    setActivePetId(null);
+    authLoadedForRef.current = null;
+    setDataLoaded(false);
+  };
+
+  // ตั้งค่า OS notification handler ครั้งเดียว
+  useEffect(() => {
+    initNotifications();
+  }, []);
+
+  // ตรวจ session ตอนเปิดแอป + รองรับ Google OAuth redirect กลับเข้ามา
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    (async () => {
+      const session = await authApi.getSession();
+      if (session?.user) {
+        const ok = await handleAuthed(session.user.id);
+        if (!ok) {
+          // โหลดข้อมูลไม่สำเร็จ — ออกจากระบบเพื่อกลับไปโหมด mock อย่างสะอาด
+          await authApi.signOut().catch(() => {});
+          setUserId(null);
+        }
+      } else {
+        setAuthReady(true);
+      }
+    })();
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session?.user) handleAuthed(session.user.id);
+    });
+    return () => data?.subscription?.unsubscribe();
+  }, []);
+
+  // ---------- ยืนยันตัวตน (ส่งให้หน้า Login/Register ใช้เมื่อตั้งค่า cloud แล้ว) ----------
+  const submitLogin = async (identifier, password) => {
+    try {
+      const session = await authApi.signIn(identifier, password);
+      const ok = await handleAuthed(session.user.id);
+      if (!ok) return { ok: false, error: "โหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" };
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: authApi.translateAuthError(e?.message) };
+    }
+  };
+
+  const submitRegister = async (form) => {
+    try {
+      const data = await authApi.signUp(form);
+      if (data.session) {
+        const ok = await handleAuthed(data.session.user.id);
+        if (!ok) return { ok: false, error: "สมัครสำเร็จแต่โหลดข้อมูลไม่ได้ กรุณาเข้าสู่ระบบใหม่" };
+        return { ok: true };
+      }
+      return { ok: true, needConfirm: true };
+    } catch (e) {
+      return { ok: false, error: authApi.translateAuthError(e?.message) };
+    }
+  };
+
+  const submitGoogle = async () => {
+    try {
+      await authApi.signInWithGoogle();
+      return { ok: true }; // web: จะ redirect ออกนอกหน้า กลับมาโดย onAuthStateChange
+    } catch {
+      return { ok: false, error: "ยังไม่ได้ตั้งค่า Google Sign-in ใน Supabase" };
+    }
+  };
+
   const go = (s) => setScreenStack((prev) => [...prev, s]);
 
   
@@ -75,16 +220,18 @@ export default function App() {
 
   
   const addPet = (newPet, initialWeight) => {
-    setPets((prev) => [...prev, newPet]);
+    const pet = { ...newPet, id: uuid() }; // DB ใช้ uuid
+    setPets((prev) => [...prev, pet]);
     if (initialWeight) {
       setWeightData((prev) => ({
         ...prev,
-        [newPet.id]: [...(prev[newPet.id] || []), { value: initialWeight, date: new Date().toISOString() }],
+        [pet.id]: [...(prev[pet.id] || []), { value: initialWeight, date: new Date().toISOString() }],
       }));
     }
+    if (cloud) mirror(db.insertPet(userId, pet, initialWeight));
   };
 
-  
+
   const removePet = (id) => {
     setPets((prev) => prev.filter((p) => p.id !== id));
     const dropKey = (prev) => {
@@ -105,14 +252,16 @@ export default function App() {
     setAppointments((prev) => prev.filter((a) => a.petId !== id));
     setNotifications((prev) => prev.filter((n) => n.petId !== id));
     setActivePetId((prev) => (prev === id ? null : prev));
-  };
+    if (cloud) mirror(db.deletePet(id));
+  }
 
- 
+
   const addWeightEntry = (petId, value, date) => {
     setWeightData((prev) => ({
       ...prev,
       [petId]: [...(prev[petId] || []), { value, date: date.toISOString() }],
     }));
+    if (cloud) mirror(db.upsertWeight(userId, petId, { value, date: date.toISOString() }));
   };
 
   const completeHealthItem = (petId, itemId) => {
@@ -128,24 +277,40 @@ export default function App() {
         },
       };
     });
+    if (cloud) mirror(db.completeHealthItem(userId, petId, itemId));
   };
 
   const addHealthItem = (petId, item) => {
+    const withId = { ...item, id: uuid() };
     setHealthData((prev) => {
       const current = prev[petId] || { upcoming: [], completed: [] };
       return {
         ...prev,
-        [petId]: { ...current, upcoming: [...current.upcoming, item] },
+        [petId]: { ...current, upcoming: [...current.upcoming, withId] },
       };
     });
+    if (cloud) mirror(db.insertHealthItem(userId, petId, withId));
   };
 
-  const addAppointment = (appt) => setAppointments((prev) => [...prev, appt]);
-  const removeAppointment = (id) => setAppointments((prev) => prev.filter((a) => a.id !== id));
+  const addAppointment = (appt) => {
+    const withId = { ...appt, id: uuid() };
+    setAppointments((prev) => [...prev, withId]);
+    if (cloud) mirror(db.insertAppointment(userId, withId));
+  };
+  const removeAppointment = (id) => {
+    setAppointments((prev) => prev.filter((a) => a.id !== id));
+    if (cloud) mirror(db.deleteAppointment(id));
+  };
 
-  const markRead = (id) =>
+  const markRead = (id) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-  
+    if (cloud) mirror(db.markNotificationRead(id));
+  };
+
+  const markAllRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (cloud) mirror(db.markAllNotificationsRead(userId));
+  };
   const dismissedReminderIdsRef = useRef(new Set());
 
   const removeNotification = (id) => {
@@ -153,6 +318,7 @@ export default function App() {
       dismissedReminderIdsRef.current.add(id);
     }
     setNotifications((prev) => prev.filter((n) => n.id !== id));
+    if (cloud) mirror(db.deleteNotificationByDedupeKey(id));
   };
 
   
@@ -166,37 +332,99 @@ export default function App() {
     }
   };
 
-  const updateUser = (patch) => setUser((prev) => ({ ...prev, ...patch }));
+  const updateUser = (patch) => {
+    setUser((prev) => ({ ...prev, ...patch }));
+    if (cloud) {
+      if (patch.photo) {
+        // รูปโปรไฟล์: อัปโหลดขึ้น Storage แล้วเก็บ avatar_path (แทน uri ในเครื่อง)
+        mirror((async () => {
+          const path = await uploadPhoto(userId, "profile", "users", patch.photo);
+          await db.saveUserPatch(userId, path ? { avatar_path: path } : {});
+        })());
+      }
+      mirror(db.saveUserPatch(userId, patch));
+    }
+  };
 
-  
-  const makeListHandlers = (setter) => ({
-    onAdd: (petId, item) =>
-      setter((prev) => ({ ...prev, [petId]: [...(prev[petId] || []), item] })),
-    onEdit: (petId, itemId, patch) =>
+
+  const makeListHandlers = (setter, sync) => ({
+    onAdd: (petId, item) => {
+      const withId = { ...item, id: uuid() }; // DB ใช้ uuid
+      setter((prev) => ({ ...prev, [petId]: [...(prev[petId] || []), withId] }));
+      if (cloud) mirror(sync.insert(userId, petId, withId));
+    },
+    onEdit: (petId, itemId, patch) => {
       setter((prev) => ({
         ...prev,
         [petId]: (prev[petId] || []).map((i) => (i.id === itemId ? { ...i, ...patch } : i)),
-      })),
-    onRemove: (petId, itemId) =>
+      }));
+      if (cloud) mirror(sync.update(itemId, patch));
+    },
+    onRemove: (petId, itemId) => {
       setter((prev) => ({
         ...prev,
         [petId]: (prev[petId] || []).filter((i) => i.id !== itemId),
-      })),
+      }));
+      if (cloud) mirror(sync.remove(itemId));
+    },
   });
 
-  const foodHandlers = makeListHandlers(setFoodData);
-  const activityHandlers = makeListHandlers(setActivityData);
-  const notesHandlers = makeListHandlers(setNotesData);
+  const foodHandlers = makeListHandlers(setFoodData, {
+    insert: db.insertFoodLog,
+    update: db.updateFoodLog,
+    remove: (id) => db.deleteRow("food_logs", id),
+  });
+  const activityHandlers = makeListHandlers(setActivityData, {
+    insert: db.insertActivityLog,
+    update: (id, patch) =>
+      db.updateListRow("activity_logs", id, {
+        description: patch.text,
+        kind: patch.tag,
+        // minutes เป็น null เมื่อข้อความใหม่ไม่มีตัวเลข — ไม่ส่งไปแทนที่จะชน NOT NULL
+        minutes: patch.minutes == null ? undefined : patch.minutes,
+      }),
+    remove: (id) => db.deleteRow("activity_logs", id),
+  });
+  const notesHandlers = makeListHandlers(setNotesData, {
+    insert: db.insertNote,
+    update: (id, patch) =>
+      db.updateListRow("notes", id, {
+        body: patch.text,
+        category: patch.category,
+        pinned: patch.pinned,
+        // ส่ง reminder_at เฉพาะเมื่อแก้ reminder เท่านั้น — กัน pin/แก้ข้อความลบทิ้ง
+        ...( "reminderAt" in patch ? { reminder_at: patch.reminderAt ?? null } : {}),
+      }),
+    remove: (id) => db.deleteRow("notes", id),
+  });
 
-  
-  const setFoodGoal = (petId, grams) => setFoodGoals((prev) => ({ ...prev, [petId]: grams }));
-  const setActivityGoal = (petId, mins) => setActivityGoals((prev) => ({ ...prev, [petId]: mins }));
-  const setWalkReminder = (petId, patch) =>
+
+  const composeSettings = (petId, foodGoal, activityGoal) => ({
+    foodGoalG: foodGoal,
+    activityGoalMin: activityGoal,
+    foodReminder: foodReminderPrefs[petId],
+    walkReminder: walkReminderPrefs[petId],
+    vaccineReminder: reminderPrefs[petId],
+  });
+  const setFoodGoal = (petId, grams) => {
+    setFoodGoals((prev) => ({ ...prev, [petId]: grams }));
+    if (cloud) mirror(db.upsertSettings(userId, petId, composeSettings(petId, grams, activityGoals[petId] ?? DEFAULT_ACTIVITY_GOAL_MIN)));
+  };
+  const setActivityGoal = (petId, mins) => {
+    setActivityGoals((prev) => ({ ...prev, [petId]: mins }));
+    if (cloud) mirror(db.upsertSettings(userId, petId, composeSettings(petId, foodGoals[petId] ?? DEFAULT_FOOD_GOAL_G, mins)));
+  };
+  const setWalkReminder = (petId, patch) => {
     setWalkReminderPrefs((prev) => ({
       ...prev,
       [petId]: { on: true, hour: DEFAULT_WALK_REMINDER_HOUR, ...prev[petId], ...patch },
     }));
-  const setFoodReminder = (petId, patch) =>
+    if (cloud) {
+      const merged = { on: true, hour: DEFAULT_WALK_REMINDER_HOUR, ...walkReminderPrefs[petId], ...patch };
+      mirror(db.upsertSettings(userId, petId, { ...composeSettings(petId, foodGoals[petId] ?? DEFAULT_FOOD_GOAL_G, activityGoals[petId] ?? DEFAULT_ACTIVITY_GOAL_MIN), walkReminder: merged }));
+    }
+  };
+  const setFoodReminder = (petId, patch) => {
     setFoodReminderPrefs((prev) => {
       const cur = prev[petId] || { on: true };
       return {
@@ -204,6 +432,12 @@ export default function App() {
         [petId]: { ...cur, ...patch, hours: { ...(cur.hours || {}), ...(patch.hours || {}) } },
       };
     });
+    if (cloud) {
+      const cur = foodReminderPrefs[petId] || { on: true };
+      const merged = { ...cur, ...patch, hours: { ...(cur.hours || {}), ...(patch.hours || {}) } };
+      mirror(db.upsertSettings(userId, petId, { ...composeSettings(petId, foodGoals[petId] ?? DEFAULT_FOOD_GOAL_G, activityGoals[petId] ?? DEFAULT_ACTIVITY_GOAL_MIN), foodReminder: merged }));
+    }
+  };
 
   const back = () =>
     setScreenStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : ["home"]));
@@ -211,7 +445,14 @@ export default function App() {
   const goWithBack = (s) => {
     if (s === "back") back();
     else if (s === "welcome") setScreenStack(["welcome"]);
-    else if (s === "logout") setScreenStack(["login"]);
+    else if (s === "logout") {
+      if (cloud) {
+        authApi.signOut().catch(() => {});
+        resetData();
+        setUserId(null);
+      }
+      setScreenStack(["login"]);
+    }
     else go(s);
   };
 
@@ -228,8 +469,11 @@ export default function App() {
 
   useEffect(() => {
     const check = () => {
+      // โหมด cloud: ข้ามจนกว่าข้อมูลจริงจะโหลดมาแล้ว (ไม่งั้นยิงแจ้งเตือนจาก mock data ที่ id ไม่มีใน DB)
+      if (cloud && !dataLoaded) return;
       const now = new Date();
-      const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+      // รูปแบบ YYYY-MM-DD ต้องตรงกับ server (0002_reminders.sql) เพื่อให้ dedupe_key ซ้ำกันได้
+      const dateKey = db.localDateKey(now.toISOString());
       // สถานะมื้อวันนี้ของทุกสัตว์: id → { fed: ล็อกแล้ว, pastDue: เลยเวลาหรือยัง, title, petId }
       const todayMeals = new Map();
       for (const pet of pets) {
@@ -264,18 +508,29 @@ export default function App() {
           return st != null && !st.fed;
         });
         if (toAdd.length === 0 && next.length === prev.length) return prev;
+        if (cloud) {
+          for (const n of toAdd) {
+            mirror(db.insertNotification(userId, n, "meal"));
+            showReminder(n.title, "แตะเพื่อเปิดแอปและบันทึกมื้ออาหาร");
+          }
+          for (const n of prev) {
+            if (n.id.startsWith("meal-") && !next.includes(n)) mirror(db.deleteNotificationByDedupeKey(n.id));
+          }
+        }
         return toAdd.length ? [...toAdd, ...next] : next;
       });
     };
     check();
     const timer = setInterval(check, 60000);
     return () => clearInterval(timer);
-  }, [pets, foodData, foodReminderPrefs]);
+  }, [pets, foodData, foodReminderPrefs, notifications, cloud, userId, dataLoaded]);
 
   useEffect(() => {
     const check = () => {
+      if (cloud && !dataLoaded) return;
       const now = new Date();
-      const dateKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+      // รูปแบบ YYYY-MM-DD ต้องตรงกับ server (0002_reminders.sql) เพื่อให้ dedupe_key ซ้ำกันได้
+      const dateKey = db.localDateKey(now.toISOString());
       const toAdd = [];
       for (const pet of pets) {
         const pref = walkReminderPrefs[pet.id] || { on: true, hour: DEFAULT_WALK_REMINDER_HOUR };
@@ -297,17 +552,24 @@ export default function App() {
       setNotifications((prev) => {
         const existing = new Set(prev.map((n) => n.id));
         const fresh = toAdd.filter((n) => !existing.has(n.id) && !dismissedReminderIdsRef.current.has(n.id));
+        if (cloud) {
+          for (const n of fresh) {
+            mirror(db.insertNotification(userId, n, "walk"));
+            showReminder(n.title, "แตะเพื่อเปิดแอปและบันทึกกิจกรรม");
+          }
+        }
         return fresh.length ? [...fresh, ...prev] : prev;
       });
     };
     check();
     const timer = setInterval(check, 60000);
     return () => clearInterval(timer);
-  }, [pets, activityData, walkReminderPrefs]);
+  }, [pets, activityData, walkReminderPrefs, notifications, cloud, userId, dataLoaded]);
 
   
   useEffect(() => {
     const check = () => {
+      if (cloud && !dataLoaded) return;
       const now = new Date();
       const due = [];
       for (const pet of pets) {
@@ -318,6 +580,7 @@ export default function App() {
         }
       }
       if (due.length === 0) return;
+      if (cloud) for (const { item } of due) mirror(db.markNoteReminded(item.id));
       setNotesData((prev) => {
         const next = { ...prev };
         for (const { petId, item } of due) {
@@ -325,22 +588,29 @@ export default function App() {
         }
         return next;
       });
-      setNotifications((prev) => [
-        ...due.map(({ petId, item }) => ({
+      setNotifications((prev) => {
+        const add = due.map(({ petId, item }) => ({
           id: `note-${petId}-${item.id}`,
           title: `แจ้งเตือน: ${item.text}`,
           time: "เมื่อสักครู่",
           read: false,
           petId,
           screen: "notes",
-        })),
-        ...prev.filter((n) => !due.some(({ petId, item }) => n.id === `note-${petId}-${item.id}`)),
-      ]);
+        }));
+        const filtered = prev.filter((n) => !add.some((a) => a.id === n.id));
+        if (cloud) {
+          for (const n of add) {
+            mirror(db.insertNotification(userId, n, "note"));
+            showReminder(n.title, "แตะเพื่อเปิดแอปและดูโน้ต");
+          }
+        }
+        return [...add, ...filtered];
+      });
     };
     check();
     const timer = setInterval(check, 60000);
     return () => clearInterval(timer);
-  }, [pets, notesData]);
+  }, [pets, notesData, notifications, cloud, userId, dataLoaded]);
 
 
   const renderScreen = () => {
@@ -348,9 +618,21 @@ export default function App() {
     case "welcome":
       return <WelcomeScreen go={goWithBack} />;
     case "login":
-      return <LoginScreen go={goWithBack} />;
+      return (
+        <LoginScreen
+          go={goWithBack}
+          submitLogin={submitLogin}
+          submitGoogle={submitGoogle}
+        />
+      );
     case "register":
-      return <RegisterScreen go={goWithBack} />;
+      return (
+        <RegisterScreen
+          go={goWithBack}
+          submitRegister={submitRegister}
+          submitGoogle={submitGoogle}
+        />
+      );
     case "home":
       return <HomeScreen go={goWithBack} pets={pets} weightData={weightData} selectPet={selectPet} removePet={removePet} />;
     case "addPet":
@@ -450,6 +732,7 @@ export default function App() {
           markRead={markRead}
           removeNotification={removeNotification}
           onOpen={openNotification}
+          onMarkAllRead={markAllRead}
         />
       );
     case "overallAppointments":
@@ -481,6 +764,11 @@ export default function App() {
   }
   };
 
+
+  // กำลังเช็ค session ตอนเปิดแอป (โหมด cloud) — แสดงพื้นหลังเปล่ารอสักครู่
+  if (!authReady) {
+    return <LinearGradient colors={gradient.screen} style={{ flex: 1 }} />;
+  }
 
   return (
     <LinearGradient colors={gradient.screen} style={{ flex: 1 }}>

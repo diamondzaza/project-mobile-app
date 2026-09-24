@@ -14,6 +14,8 @@ import useHideOnScrollBar from "../components/useHideOnScrollBar";
 import { colors, category, radius } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 
+const styles = { markAll: { fontSize: 13, fontWeight: "600", color: colors.accent } };
+
 
 const CATEGORY_BY_SCREEN = {
   food: "food",
@@ -47,11 +49,21 @@ function metaFor(screen) {
   return { icon, bg: colors.greenPastel, color: colors.brown };
 }
 
-function NotificationsScreen({ go, notifications, onOpen, removeNotification }) {
+function NotificationsScreen({ go, notifications, onOpen, removeNotification, onMarkAllRead }) {
   const tabBar = useHideOnScrollBar();
+  const unreadCount = notifications.filter((n) => !n.read).length;
   return (
     <SafeAreaView style={sharedStyles.container}>
-      <Header title="การแจ้งเตือน" />
+      <Header
+        title="การแจ้งเตือน"
+        right={
+          onMarkAllRead && unreadCount > 0 ? (
+            <Pressable onPress={onMarkAllRead} hitSlop={8}>
+              <AppText style={styles.markAll}>อ่านทั้งหมด</AppText>
+            </Pressable>
+          ) : undefined
+        }
+      />
       <AnimatedScrollView
         onScroll={tabBar.onScroll}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: TAB_BAR_CLEARANCE }}

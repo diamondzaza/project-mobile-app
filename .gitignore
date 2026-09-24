@@ -3,16 +3,47 @@ node_modules/
 
 # Expo
 .expo/
+.expo-shared/
 dist/
 web-build/
 expo-env.d.ts
+*.tsbuildinfo
 
-# Native
-*.orig.*
+# Supabase CLI (ข้อมูลเชื่อมเครื่องนี้)
+supabase/.temp/
+supabase/.branches/
 
-# macOS
+# Supabase migrations (สคริปต์สร้างฐานข้อมูล — รันบน Supabase แล้ว เก็บไว้ในเครื่อง)
+supabase/migrations/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Vercel CLI
+.vercel/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
 .DS_Store
+Thumbs.db
 
 # IDE
 .idea/
 .vscode/
+
+# Claude Code (ค่า permission ในเครื่อง)
+.claude/settings.local.json
+
+# รูปต้นฉบับขนาดใหญ่ที่แอปไม่ใช้ (แอปใช้แค่ LOGO1-circle.webp)
+src/IMG/LOGO1.png
+src/IMG/LOGO1-circle.png
+
+# เอกสารโปรเจกต์ (เก็บไว้ในเครื่อง)
+README.md
+CONFIG-NEEDED.md

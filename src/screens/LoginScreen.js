@@ -1,7 +1,7 @@
 /** หน้าเข้าสู่ระบบ  */
 import { useState } from "react";
 import { SafeAreaView, View, Pressable, Image, StyleSheet } from "react-native";
-import { User, Mail, Phone, Lock } from "lucide-react-native";
+import { User, Mail, Lock } from "lucide-react-native";
 
 import AppText from "../components/AppText";
 import AnimatedScrollView from "../components/AnimatedScrollView";
@@ -29,21 +29,14 @@ const METHODS = [
     keyboardType: "email-address",
     validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || "รูปแบบอีเมลไม่ถูกต้อง",
   },
-  {
-    key: "phone",
-    label: "เบอร์โทรศัพท์",
-    icon: Phone,
-    placeholder: "0812345678",
-    keyboardType: "phone-pad",
-    validate: (v) => v.replace(/\D/g, "").length >= 9 || "เบอร์โทรศัพท์ไม่ถูกต้อง",
-  },
 ];
 
-function LoginScreen({ go }) {
+function LoginScreen({ go, submitLogin, submitGoogle }) {
   const [method, setMethod] = useState(METHODS[0]);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
 
   const switchMethod = (m) => {
     setMethod(m);
@@ -51,19 +44,35 @@ function LoginScreen({ go }) {
     setErrors({});
   };
 
- 
-  const submit = () => {
+
+  const submit = async () => {
+    if (busy) return;
     const idResult = method.validate(identifier);
     const next = {};
     if (idResult !== true) next.identifier = idResult;
     if (password.trim().length < 6) next.password = "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร";
     setErrors(next);
     if (Object.keys(next).length) return;
-    go("home");
+
+    // Supabase Auth รองรับ email (username ยังไม่รองรับ)
+    if (method.key === "username") {
+      setErrors({ identifier: "โปรดเข้าสู่ระบบด้วยอีเมล" });
+      return;
+    }
+    setBusy(true);
+    const res = await submitLogin(identifier, password);
+    setBusy(false);
+    if (!res.ok) setErrors({ password: res.error });
   };
 
-  
-  const loginWithGoogle = () => go("home");
+
+  const loginWithGoogle = async () => {
+    if (busy) return;
+    setBusy(true);
+    const res = await submitGoogle();
+    setBusy(false);
+    if (!res.ok) setErrors({ password: res.error });
+  };
 
   return (
     <SafeAreaView style={sharedStyles.container}>
@@ -124,7 +133,13 @@ function LoginScreen({ go }) {
               error={errors.password}
             />
 
-            <Button title="เข้าสู่ระบบ" size="lg" onPress={submit} style={styles.primaryButton} />
+            <Button
+              title={busy ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+              size="lg"
+              onPress={submit}
+              disabled={busy}
+              style={styles.primaryButton}
+            />
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />

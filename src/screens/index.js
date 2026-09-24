@@ -15,3 +15,4 @@ export { default as NotificationsScreen } from "./NotificationsScreen";
 export { default as OverallAppointmentsScreen } from "./OverallAppointmentsScreen";
 export { default as UserProfileScreen } from "./UserProfileScreen";
 export { default as EditProfileScreen } from "./EditProfileScreen";
+export { default as SetupScreen } from "./SetupScreen";

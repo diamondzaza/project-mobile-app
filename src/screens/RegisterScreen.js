@@ -1,7 +1,7 @@
 /** หน้าสมัครสมาชิก*/
 import { useState } from "react";
 import { SafeAreaView, View, Pressable, StyleSheet } from "react-native";
-import { User, AtSign, Mail, Phone, Lock, KeyRound } from "lucide-react-native";
+import { User, AtSign, Mail, Lock, KeyRound } from "lucide-react-native";
 
 import Header from "../components/Header";
 import AnimatedScrollView from "../components/AnimatedScrollView";
@@ -38,14 +38,6 @@ const FIELDS = [
     validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || "รูปแบบอีเมลไม่ถูกต้อง",
   },
   {
-    key: "phone",
-    label: "เบอร์โทรศัพท์ (ไม่บังคับ)",
-    icon: Phone,
-    placeholder: "0812345678",
-    keyboardType: "phone-pad",
-    validate: (v) => !v.trim() || v.replace(/\D/g, "").length >= 9 || "เบอร์โทรศัพท์ไม่ถูกต้อง",
-  },
-  {
     key: "password",
     label: "รหัสผ่าน",
     icon: Lock,
@@ -65,16 +57,20 @@ const FIELDS = [
 
 const EMPTY_VALUES = Object.fromEntries(FIELDS.map((f) => [f.key, ""]));
 
-function RegisterScreen({ go }) {
+function RegisterScreen({ go, submitRegister, submitGoogle }) {
   const [values, setValues] = useState(EMPTY_VALUES);
   const [errors, setErrors] = useState({});
+  const [notice, setNotice] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const setValue = (key, t) => {
     setValues((v) => ({ ...v, [key]: t }));
     setErrors((e) => ({ ...e, [key]: null }));
+    setNotice(null);
   };
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return;
     const next = {};
     for (const f of FIELDS) {
       const result = f.validate(values[f.key], values);
@@ -82,11 +78,29 @@ function RegisterScreen({ go }) {
     }
     setErrors(next);
     if (Object.keys(next).length) return;
-    go("home");
+
+    // สมัครสมาชิกจริงผ่าน Supabase Auth
+    setBusy(true);
+    const res = await submitRegister({
+      email: values.email,
+      password: values.password,
+      name: values.name,
+      username: values.username,
+      phone: values.phone,
+    });
+    setBusy(false);
+    if (!res.ok) setErrors({ password: res.error });
+    else if (res.needConfirm) setNotice("สมัครสำเร็จ! กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ");
   };
 
 
-  const signupWithGoogle = () => go("home");
+  const signupWithGoogle = async () => {
+    if (busy) return;
+    setBusy(true);
+    const res = await submitGoogle();
+    setBusy(false);
+    if (!res.ok) setErrors({ password: res.error });
+  };
 
   return (
     <SafeAreaView style={sharedStyles.container}>
@@ -113,7 +127,17 @@ function RegisterScreen({ go }) {
               />
             ))}
 
-            <Button title="สมัครสมาชิก" size="lg" onPress={submit} style={styles.primaryButton} />
+            {notice && (
+              <AppText style={styles.notice}>{notice}</AppText>
+            )}
+
+            <Button
+              title={busy ? "กำลังสมัครสมาชิก..." : "สมัครสมาชิก"}
+              size="lg"
+              onPress={submit}
+              disabled={busy}
+              style={styles.primaryButton}
+            />
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
@@ -146,6 +170,7 @@ function RegisterScreen({ go }) {
 const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 32 },
   cardContent: { paddingTop: 16 },
+  notice: { fontSize: 13, color: colors.brown, marginTop: 4, marginBottom: 8, textAlign: "center" },
   primaryButton: { width: "100%", marginTop: 4 },
   dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 18, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
