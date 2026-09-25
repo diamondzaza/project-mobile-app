@@ -56,7 +56,7 @@ function AddPetScreen({ go, addPet }) {
     }
     const initialWeight = parseFloat(weight);
     const weightToSeed = !isNaN(initialWeight) && initialWeight > 0 ? initialWeight : null;
-    addPet(
+    const ok = addPet(
       {
         id: Date.now().toString(),
         name: name.trim(),
@@ -69,7 +69,7 @@ function AddPetScreen({ go, addPet }) {
       },
       weightToSeed
     );
-    go("home");
+    if (ok !== false) go("home"); // false = ถูกจำกัดจำนวนสัตว์ — ค้างไว้ให้แก้/อัปเกรด
   };
 
   return (

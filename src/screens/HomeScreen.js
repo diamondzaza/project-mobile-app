@@ -7,9 +7,11 @@ import BottomTabBar, { TAB_BAR_CLEARANCE } from "../components/BottomTabBar";
 import GradientSurface from "../components/GradientSurface";
 import PetIcon from "../components/PetIcon";
 import Card from "../components/Card";
+import AdBanner from "../components/AdBanner";
 import { colors, radius, shadow, shadowLg } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 import { confirmDialog } from "../utils/confirm";
+import { AD_LEVELS } from "../data/constants";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 import useHideOnScrollBar from "../components/useHideOnScrollBar";
@@ -36,8 +38,9 @@ function latestWeight(weightData, id) {
   return `${value} kg`;
 }
 
-function HomeScreen({ go, pets, weightData, selectPet, removePet }) {
+function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standard" }) {
   const tabBar = useHideOnScrollBar();
+  const adLevel = AD_LEVELS[tier] ?? "banner";
   const confirmRemove = (pet) => {
   
     confirmDialog({
@@ -57,6 +60,11 @@ function HomeScreen({ go, pets, weightData, selectPet, removePet }) {
         <View style={{ width: 24 }} />
       </GradientSurface>
       <AnimatedScrollView onScroll={tabBar.onScroll} contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: TAB_BAR_CLEARANCE }}>
+        {adLevel !== "none" && (
+          <Reveal>
+            <AdBanner level={adLevel} onPressUpgrade={() => go("subscription")} />
+          </Reveal>
+        )}
         <View style={styles.petGrid}>
           {pets.map((item) => (
             <Reveal key={item.id} style={styles.petCardWrapper}>

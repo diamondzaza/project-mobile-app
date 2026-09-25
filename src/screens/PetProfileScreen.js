@@ -7,6 +7,7 @@ import AppText from "../components/AppText";
 
 import { colors, shadowLg } from "../theme";
 import PetIcon from "../components/PetIcon";
+import HealthInsightCard from "../components/HealthInsightCard";
 import { timeAgo } from "../utils/date";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
@@ -31,7 +32,7 @@ const glassCardStrong = {
   elevation: 7,
 };
 
-function PetProfileScreen({ go, activePet, weightData, healthData, appointments, foodData, activityData, notesData }) {
+function PetProfileScreen({ go, activePet, weightData, healthData, appointments, foodData, activityData, notesData, tier = "standard" }) {
   if (!activePet) return null;
 
   const wData = (weightData[activePet.id] || [])
@@ -131,6 +132,15 @@ function PetProfileScreen({ go, activePet, weightData, healthData, appointments,
             </View>
           </Reveal>
 
+          {/* วิเคราะห์สุขภาพขั้นสูง — ฟีเจอร์ Plus/Premium */}
+          {["plus", "premium"].includes(tier) && (
+            <Reveal>
+              <View style={styles.insightWrap}>
+                <HealthInsightCard entries={wData} healthyRange={activePet.healthyRange} petName={activePet.name} />
+              </View>
+            </Reveal>
+          )}
+
           {/* ---------- Footer tip ---------- */}
           <AppText style={styles.footerTip}>เคล็ดลับ: แตะหมวดหมู่เพื่อบันทึกหรือดูรายการ</AppText>
       </AnimatedScrollView>
@@ -192,6 +202,7 @@ const styles = StyleSheet.create({
   statTrend: { color: "#3E7A50", fontSize: 12, fontWeight: "500" },
 
   grid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", paddingHorizontal: 20, marginTop: 18 },
+  insightWrap: { marginHorizontal: 20, marginTop: 4 },
   gridCard: {
     width: "47%",
     borderRadius: 20,

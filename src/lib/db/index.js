@@ -7,4 +7,5 @@ export * from "./appointments";
 export * from "./notifications";
 export * from "./devices";
 export * from "./users";
+export * from "./subscriptions";
 export * from "./load";

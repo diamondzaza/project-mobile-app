@@ -1,6 +1,6 @@
 /** คอมโพเนนต์หลักของแอป */
 import { useState, useEffect, useRef } from "react";
-import { BackHandler } from "react-native";
+import { BackHandler, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import {
@@ -8,6 +8,7 @@ import {
   LoginScreen,
   RegisterScreen,
   SetupScreen,
+  SubscriptionScreen,
   HomeScreen,
   AddPetScreen,
   PetProfileScreen,
@@ -22,7 +23,7 @@ import {
   UserProfileScreen,
   EditProfileScreen,
 } from "./screens";
-import { MEAL_REMINDERS, DEFAULT_FOOD_GOAL_G, DEFAULT_ACTIVITY_GOAL_MIN, DEFAULT_WALK_REMINDER_HOUR } from "./data/constants";
+import { MEAL_REMINDERS, DEFAULT_FOOD_GOAL_G, DEFAULT_ACTIVITY_GOAL_MIN, DEFAULT_WALK_REMINDER_HOUR, PET_LIMITS, AD_LEVELS } from "./data/constants";
 import { isSameDate } from "./utils/date";
 import { gradient } from "./theme";
 import { supabase, isSupabaseConfigured } from "./lib/supabase";
@@ -66,6 +67,7 @@ function AppInner() {
   const [foodReminderPrefs, setFoodReminderPrefs] = useState({});
   
   const [reminderPrefs, setReminderPrefs] = useState({});
+  const [tier, setTier] = useState("standard"); // แพ็กเกจสมาชิก: standard | plus | premium
   const setReminderOn = (petId, v) => {
     setReminderPrefs((prev) => ({ ...prev, [petId]: v }));
     if (cloud) {
@@ -103,6 +105,7 @@ function AppInner() {
     setWalkReminderPrefs(data.walkReminderPrefs);
     setFoodReminderPrefs(data.foodReminderPrefs);
     setReminderPrefs(data.reminderPrefs);
+    setTier(data.tier ?? "standard");
   };
 
   /** โหลดข้อมูลของ user ลง state — คืน true เมื่อสำเร็จ (false = ลองใหม่ได้) */
@@ -210,6 +213,43 @@ function AppInner() {
     }
   };
 
+  // ---------- แพ็กเกจสมาชิก ----------
+  /** โหลดข้อมูลใหม่จาก DB (ใช้หลังเปลี่ยน tier เพื่อให้จำกัดประวัติตรงกันทันที) */
+  const refreshData = async () => {
+    try {
+      applyLoaded(await db.loadAllData(userId));
+      return true;
+    } catch (e) {
+      console.warn("[load]", e?.message || e);
+      return false;
+    }
+  };
+
+  const activateTier = async (newTier) => {
+    try {
+      if (cloud) await db.activateSubscription(userId, newTier, { days: 30 });
+      setTier(newTier);
+      if (cloud) await refreshData();
+      Alert.alert("สำเร็จ!", `เปิดใช้แพ็กเกจ ${newTier.toUpperCase()} แล้ว (ทดลองใช้ 30 วัน)`);
+    } catch (e) {
+      console.warn("[sync]", e?.message || e);
+      setTier("standard");
+      Alert.alert("ไม่สำเร็จ", "บันทึกขึ้นฐานข้อมูลไม่ได้ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
+  const cancelTier = async () => {
+    try {
+      if (cloud) await db.cancelSubscription(userId);
+      setTier("standard");
+      if (cloud) await refreshData();
+      Alert.alert("ยกเลิกแล้ว", "กลับไปใช้แพ็กเกจ Standard เรียบร้อย");
+    } catch (e) {
+      console.warn("[sync]", e?.message || e);
+      Alert.alert("ไม่สำเร็จ", "บันทึกขึ้นฐานข้อมูลไม่ได้ กรุณาลองใหม่อีกครั้ง");
+    }
+  };
+
   const go = (s) => setScreenStack((prev) => [...prev, s]);
 
   
@@ -220,6 +260,15 @@ function AppInner() {
 
   
   const addPet = (newPet, initialWeight) => {
+    // บังคับจำนวนสัตว์เลี้ยงตามแพ็กเกจ (null = ไม่จำกัด)
+    const limit = PET_LIMITS[tier];
+    if (limit != null && pets.length >= limit) {
+      Alert.alert(
+        "จำนวนสัตว์เลี้ยงเต็มตามแพ็กเกจ",
+        `แพ็กเกจปัจจุบันรองรับสูงสุด ${limit} ตัว (มีอยู่ ${pets.length} ตัว)\nอัปเกรดแพ็กเกจเพื่อเพิ่มสัตว์เลี้ยงได้ที่ "แพ็กเกจของฉัน" ในหน้าโปรไฟล์`
+      );
+      return false;
+    }
     const pet = { ...newPet, id: uuid() }; // DB ใช้ uuid
     setPets((prev) => [...prev, pet]);
     if (initialWeight) {
@@ -229,6 +278,7 @@ function AppInner() {
       }));
     }
     if (cloud) mirror(db.insertPet(userId, pet, initialWeight));
+    return true;
   };
 
 
@@ -314,7 +364,7 @@ function AppInner() {
   const dismissedReminderIdsRef = useRef(new Set());
 
   const removeNotification = (id) => {
-    if (id.startsWith("meal-") || id.startsWith("walk-") || id.startsWith("note-")) {
+    if (id.startsWith("meal-") || id.startsWith("walk-") || id.startsWith("note-") || id.startsWith("appt-")) {
       dismissedReminderIdsRef.current.add(id);
     }
     setNotifications((prev) => prev.filter((n) => n.id !== id));
@@ -612,6 +662,46 @@ function AppInner() {
     return () => clearInterval(timer);
   }, [pets, notesData, notifications, cloud, userId, dataLoaded]);
 
+  // Engine 4: แจ้งเตือนนัดหมายล่วงหน้า 5 วัน (ฟีเจอร์ Plus/Premium)
+  useEffect(() => {
+    if (!["plus", "premium"].includes(tier)) return;
+    const check = () => {
+      const now = new Date();
+      const dateKey = db.localDateKey(now.toISOString());
+      const toAdd = [];
+      for (const appt of appointments) {
+        // นับแบบปฏิทิน (ไม่ใช่ ceil มิลลิวินาที) — กันนัดวันนี้แสดง "อีก 1 วัน"
+        const diffDays = Math.round(
+          (new Date(db.localDateKey(appt.dateObj.toISOString())) - new Date(db.localDateKey(now.toISOString()))) / 86400000
+        );
+        if (diffDays < 1 || diffDays > 5) continue;
+        toAdd.push({
+          id: `appt-${appt.id}-${dateKey}`,
+          title: `นัดหมาย "${appt.title}" อีก ${diffDays} วัน`,
+          time: "เมื่อสักครู่",
+          read: false,
+          petId: appt.petId,
+          screen: "petAppointments",
+        });
+      }
+      if (toAdd.length === 0) return;
+      setNotifications((prev) => {
+        const existing = new Set(prev.map((n) => n.id));
+        const fresh = toAdd.filter((n) => !existing.has(n.id) && !dismissedReminderIdsRef.current.has(n.id));
+        if (cloud) {
+          for (const n of fresh) {
+            mirror(db.insertNotification(userId, n, "appointment"));
+            showReminder(n.title, "แตะเพื่อดูรายละเอียดนัดหมาย");
+          }
+        }
+        return fresh.length ? [...fresh, ...prev] : prev;
+      });
+    };
+    check();
+    const timer = setInterval(check, 60000);
+    return () => clearInterval(timer);
+  }, [appointments, tier, notifications, cloud, userId, dataLoaded]);
+
 
   const renderScreen = () => {
     switch (screen) {
@@ -634,9 +724,11 @@ function AppInner() {
         />
       );
     case "home":
-      return <HomeScreen go={goWithBack} pets={pets} weightData={weightData} selectPet={selectPet} removePet={removePet} />;
+      return <HomeScreen go={goWithBack} pets={pets} weightData={weightData} selectPet={selectPet} removePet={removePet} tier={tier} />;
     case "addPet":
       return <AddPetScreen go={back} addPet={addPet} />;
+    case "subscription":
+      return <SubscriptionScreen go={goWithBack} tier={tier} petCount={pets.length} onActivate={activateTier} onCancel={cancelTier} />;
     case "petProfile":
       return (
         <PetProfileScreen
@@ -648,6 +740,7 @@ function AppInner() {
           foodData={foodData}
           activityData={activityData}
           notesData={notesData}
+          tier={tier}
         />
       );
 
@@ -754,6 +847,7 @@ function AppInner() {
           appointments={appointments}
           notifications={notifications}
           updateUser={updateUser}
+          tier={tier}
         />
       );
     case "editProfile":

@@ -18,7 +18,7 @@ import Reveal from "../components/Reveal";
 import useHideOnScrollBar from "../components/useHideOnScrollBar";
 import { confirmDialog } from "../utils/confirm";
 
-function UserProfileScreen({ go, user, pets = [], appointments = [], notifications = [], updateUser }) {
+function UserProfileScreen({ go, user, pets = [], appointments = [], notifications = [], updateUser, tier = "standard" }) {
   const tabBar = useHideOnScrollBar();
   const upcomingCount = appointments.length;
   const unreadCount = notifications.filter((n) => !n.read).length;
@@ -114,6 +114,12 @@ function UserProfileScreen({ go, user, pets = [], appointments = [], notificatio
           <View style={{ paddingHorizontal: 20, marginTop: 24 }}>
             <AppText style={styles.settingsSectionTitle}>บัญชี</AppText>
             <Card style={{ padding: 0, overflow: "hidden" }}>
+              <SettingsRow
+                icon="award"
+                label={`แพ็กเกจของฉัน (${tier.toUpperCase()})`}
+                onPress={() => go("subscription")}
+              />
+              <View style={styles.divider} />
               <SettingsRow icon="user" label="แก้ไขโปรไฟล์" onPress={() => go("editProfile")} />
               <View style={styles.divider} />
               <SettingsRow icon="bell" label="ตั้งค่าการแจ้งเตือน" onPress={() => go("notifications")} />

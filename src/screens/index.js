@@ -16,3 +16,4 @@ export { default as OverallAppointmentsScreen } from "./OverallAppointmentsScree
 export { default as UserProfileScreen } from "./UserProfileScreen";
 export { default as EditProfileScreen } from "./EditProfileScreen";
 export { default as SetupScreen } from "./SetupScreen";
+export { default as SubscriptionScreen } from "./SubscriptionScreen";
