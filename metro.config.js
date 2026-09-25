@@ -12,8 +12,11 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "lucide-react-native") {
     return { type: "sourceFile", filePath: lucideCjs };
   }
- 
+
   return context.resolveRequest(context, moduleName, platform);
 };
+
+// tree-shake ไอคอน — import เฉพาะตัวที่ใช้ แทนการแพ็กทั้งไลบรารี (ลดขนาด bundle เว็บ)
+config.experiments = { ...(config.experiments || {}), optimizePackageImports: ["lucide-react-native"] };
 
 module.exports = config;

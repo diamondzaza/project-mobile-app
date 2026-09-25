@@ -1,19 +1,21 @@
-/** ไฟล์รวม export barrel ของ screen ทั้งหมด  */
-export { default as WelcomeScreen } from "./WelcomeScreen";
-export { default as LoginScreen } from "./LoginScreen";
-export { default as RegisterScreen } from "./RegisterScreen";
-export { default as HomeScreen } from "./HomeScreen";
-export { default as AddPetScreen } from "./AddPetScreen";
-export { default as PetProfileScreen } from "./PetProfileScreen";
-export { default as WeightScreen } from "./WeightScreen";
-export { default as HealthScreen } from "./HealthScreen";
-export { default as PetAppointmentsScreen } from "./PetAppointmentsScreen";
-export { default as FoodScreen } from "./FoodScreen";
-export { default as ActivityScreen } from "./ActivityScreen";
-export { default as NotesScreen } from "./NotesScreen";
-export { default as NotificationsScreen } from "./NotificationsScreen";
-export { default as OverallAppointmentsScreen } from "./OverallAppointmentsScreen";
-export { default as UserProfileScreen } from "./UserProfileScreen";
-export { default as EditProfileScreen } from "./EditProfileScreen";
-export { default as SetupScreen } from "./SetupScreen";
-export { default as SubscriptionScreen } from "./SubscriptionScreen";
+/** ไฟล์รวม export barrel ของ screen ทั้งหมด — lazy load เพื่อลดงาน main-thread ตอนเปิดแอป */
+import { lazy } from "react";
+
+export const WelcomeScreen = lazy(() => import("./WelcomeScreen"));
+export const LoginScreen = lazy(() => import("./LoginScreen"));
+export const RegisterScreen = lazy(() => import("./RegisterScreen"));
+export const HomeScreen = lazy(() => import("./HomeScreen"));
+export const AddPetScreen = lazy(() => import("./AddPetScreen"));
+export const PetProfileScreen = lazy(() => import("./PetProfileScreen"));
+export const WeightScreen = lazy(() => import("./WeightScreen"));
+export const HealthScreen = lazy(() => import("./HealthScreen"));
+export const PetAppointmentsScreen = lazy(() => import("./PetAppointmentsScreen"));
+export const FoodScreen = lazy(() => import("./FoodScreen"));
+export const ActivityScreen = lazy(() => import("./ActivityScreen"));
+export const NotesScreen = lazy(() => import("./NotesScreen"));
+export const NotificationsScreen = lazy(() => import("./NotificationsScreen"));
+export const OverallAppointmentsScreen = lazy(() => import("./OverallAppointmentsScreen"));
+export const UserProfileScreen = lazy(() => import("./UserProfileScreen"));
+export const EditProfileScreen = lazy(() => import("./EditProfileScreen"));
+export const SetupScreen = lazy(() => import("./SetupScreen"));
+export const SubscriptionScreen = lazy(() => import("./SubscriptionScreen"));

@@ -1,6 +1,6 @@
 /** คอมโพเนนต์หลักของแอป */
-import { useState, useEffect, useRef } from "react";
-import { BackHandler, Alert } from "react-native";
+import { useState, useEffect, useRef, Suspense } from "react";
+import { BackHandler, Alert, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import {
@@ -866,7 +866,8 @@ function AppInner() {
 
   return (
     <LinearGradient colors={gradient.screen} style={{ flex: 1 }}>
-      {renderScreen()}
+      {/* หน้าจอเป็น lazy load — หน้าที่ยังไม่เปิดจะไม่ถูกประมวลผลตอนเปิดแอป */}
+      <Suspense fallback={<View style={{ flex: 1 }} />}>{renderScreen()}</Suspense>
     </LinearGradient>
   );
 }
