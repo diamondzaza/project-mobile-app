@@ -1,6 +1,6 @@
 /** คอมโพเนนต์หลักของแอป */
 import { useState, useEffect, useRef, Suspense } from "react";
-import { BackHandler, Alert, View, Animated, ActivityIndicator } from "react-native";
+import { BackHandler, Alert, View, Animated, ActivityIndicator, Platform } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import {
@@ -206,6 +206,16 @@ function AppInner() {
     });
     return () => data?.subscription?.unsubscribe();
   }, []);
+
+  // เว็บ: เก็บกวาด token ออกจาก address bar หลัง Supabase ใช้เสร็จ (access_token/code จาก OAuth)
+  // เหตุผล: ถ้าผู้ใช้ copy URL หลังล็อกอินไปส่งต่อ คนที่เปิดจะถูกล็อกอินเป็นบัญชีเราทันที — ทุกคนต้องได้ session ของตัวเอง
+  useEffect(() => {
+    if (Platform.OS !== "web" || !authReady) return;
+    const { location, history } = window;
+    if (location.hash || /[?&](code|access_token|refresh_token)=/.test(location.search)) {
+      history.replaceState(null, "", location.pathname);
+    }
+  }, [authReady]);
 
   // ---------- ยืนยันตัวตน (ส่งให้หน้า Login/Register ใช้เมื่อตั้งค่า cloud แล้ว) ----------
   const submitLogin = async (identifier, password) => {
