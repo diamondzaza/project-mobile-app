@@ -29,6 +29,7 @@ export const appointmentFromRow = (r) => ({
   dateObj: new Date(r.appointment_at),
   time: formatClock(r.appointment_at),
   location: r.location ?? "",
+  status: r.status ?? "upcoming",
   icon: r.icon ?? undefined,
 });
 
@@ -96,6 +97,14 @@ export function healthFromRows(rows) {
       id: r.id,
       title: r.title,
       date: r.due_text ?? (r.due_date ? formatDate(new Date(`${r.due_date}T00:00:00`)) : ""),
+      dueDate: r.due_date || null, // วันที่จริง (YYYY-MM-DD) — ใช้กับ engine แจ้งเตือนล่วงหน้า
+      category: r.category || r.kind || null,
+      clinic: r.clinic || "",
+      vetName: r.vet_name || "",
+      price: r.price != null ? Number(r.price) : null,
+      notes: r.notes || "",
+      remindDaysBefore: r.remind_days_before ?? 3,
+      photo: photoUrl(r.photo_path),
     };
     (map[r.pet_id] ||= { upcoming: [], completed: [] });
     if (r.status === "completed") map[r.pet_id].completed.push(item);

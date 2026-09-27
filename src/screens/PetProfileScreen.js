@@ -1,11 +1,11 @@
 /** หน้าโปรไฟล์สัตว์เลี้ยง dashboard  */
 import { SafeAreaView, View, Pressable, Image, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import { Feather } from "@expo/vector-icons";
+import { ChevronLeft, Droplet, TrendingUp, Heart, Calendar, Coffee, Activity, FileText, Pencil } from "lucide-react-native";
 
 import AppText from "../components/AppText";
 
-import { colors, shadowLg } from "../theme";
+import { colors, shadowLg, glass } from "../theme";
 import PetIcon from "../components/PetIcon";
 import HealthInsightCard from "../components/HealthInsightCard";
 import { timeAgo } from "../utils/date";
@@ -56,26 +56,26 @@ function PetProfileScreen({ go, activePet, weightData, healthData, appointments,
 
 
   const cards = [
-    { title: "น้ำหนัก", icon: "trending-up", soft: "#DCE9F5", main: "#4A7AB0", deep: "#335C8A", screen: "weight", status: latestW != null ? `${latestW} kg` : "ยังไม่มีข้อมูล" },
-    { title: "สุขภาพ", icon: "heart", soft: "#F6E0DC", main: "#C76B61", deep: "#A8473D", screen: "health", status: `${healthUpcoming} รายการที่กำลังจะมาถึง` },
-    { title: "นัดหมาย", icon: "calendar", soft: "#EDE3F3", main: "#8A6FB0", deep: "#6E5390", screen: "petAppointments", status: `${apptCount} นัดที่กำลังจะมาถึง` },
-    { title: "อาหาร", icon: "coffee", soft: "#F3D9C2", main: "#C97B5A", deep: "#A8552E", screen: "food", status: lastFood ? `ให้อาหารเมื่อ ${timeAgo(new Date(lastFood.createdAt))}` : "ยังไม่มีมื้ออาหาร" },
-    { title: "กิจกรรม", icon: "activity", soft: "#F3D9C2", main: "#C97B5A", deep: "#A8552E", screen: "activityLog", status: actItems.length ? `บันทึกแล้ว ${actItems.length} รายการ` : "ยังไม่มีกิจกรรม" },
-    { title: "โน้ต", icon: "file-text", soft: "#F5EBC8", main: "#9C8B2E", deep: "#7A6C1E", screen: "notes", status: `โน้ต ${noteCount} รายการ` },
+    { title: "น้ำหนัก", Icon: TrendingUp, soft: "#DCE9F5", main: "#4A7AB0", deep: "#335C8A", screen: "weight", status: latestW != null ? `${latestW} kg` : "ยังไม่มีข้อมูล" },
+    { title: "สุขภาพ", Icon: Heart, soft: "#F6E0DC", main: "#C76B61", deep: colors.danger, screen: "health", status: `${healthUpcoming} รายการที่กำลังจะมาถึง` },
+    { title: "นัดหมาย", Icon: Calendar, soft: "#EDE3F3", main: "#8A6FB0", deep: "#6E5390", screen: "petAppointments", status: `${apptCount} นัดที่กำลังจะมาถึง` },
+    { title: "อาหาร", Icon: Coffee, soft: "#F3D9C2", main: "#C97B5A", deep: colors.accentDeep, screen: "food", status: lastFood ? `ให้อาหารเมื่อ ${timeAgo(new Date(lastFood.createdAt))}` : "ยังไม่มีมื้ออาหาร" },
+    { title: "กิจกรรม", Icon: Activity, soft: "#F3D9C2", main: "#C97B5A", deep: colors.accentDeep, screen: "activityLog", status: actItems.length ? `บันทึกแล้ว ${actItems.length} รายการ` : "ยังไม่มีกิจกรรม" },
+    { title: "โน้ต", Icon: FileText, soft: "#F5EBC8", main: "#9C8B2E", deep: "#7A6C1E", screen: "notes", status: `โน้ต ${noteCount} รายการ` },
   ];
 
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <AnimatedScrollView contentContainerStyle={{ paddingBottom: 32 }}>
           <LinearGradient
-            colors={["#8F4A26", "#A8552E"]}
+            colors={["#8F4A26", colors.accentDeep]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.header}
           >
             <View style={styles.headerTop}>
               <Pressable onPress={() => go("home")} style={styles.circleBtn} accessibilityRole="button" accessibilityLabel="กลับไปหน้าสัตว์เลี้ยงของฉัน">
-                <Feather name="chevron-left" size={22} color="#FFFFFF" />
+                <ChevronLeft size={22} color={colors.white} strokeWidth={2} />
               </Pressable>
               <View style={styles.agePill}>
                 <AppText style={styles.agePillText}>{activePet.age || "ใหม่"}</AppText>
@@ -85,6 +85,16 @@ function PetProfileScreen({ go, activePet, weightData, healthData, appointments,
             <AppText style={styles.petBreed}>
               {activePet.typeLabel ? `${activePet.typeLabel} · ${activePet.breed}` : activePet.breed}
             </AppText>
+
+            {/* ปุ่มแก้ไขข้อมูลสัตว์เลี้ยง — ทับมุมขวาบนของ header ไม่บังชื่อ */}
+            <Pressable
+              onPress={() => go("editPet")}
+              style={({ pressed }) => [styles.editFab, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="แก้ไขข้อมูลสัตว์เลี้ยง"
+            >
+              <Pencil size={18} color={colors.accentDeep} strokeWidth={2} />
+            </Pressable>
           </LinearGradient>
 
           <View style={styles.avatarWrap}>
@@ -101,7 +111,7 @@ function PetProfileScreen({ go, activePet, weightData, healthData, appointments,
             <View style={styles.statWrap}>
               <View style={[glassCardStrong, styles.statCard]}>
                 <View style={[styles.statIcon, { backgroundColor: "#DCE9F5" }]}>
-                  <Feather name="droplet" size={20} color="#335C8A" />
+                  <Droplet size={20} color="#335C8A" strokeWidth={2} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <AppText style={styles.statLabel}>น้ำหนักล่าสุด</AppText>
@@ -123,7 +133,7 @@ function PetProfileScreen({ go, activePet, weightData, healthData, appointments,
                   accessibilityLabel={`${c.title}: ${c.status} แตะเพื่อเปิดหน้า ${c.title}`}
                 >
                   <View style={[styles.cardIcon, { backgroundColor: c.soft }]}>
-                    <Feather name={c.icon} size={22} color={c.deep} />
+                    <c.Icon size={22} color={c.deep} strokeWidth={2} />
                   </View>
                   <AppText style={styles.cardTitle}>{c.title}</AppText>
                   <AppText style={[styles.cardStatus, { color: c.deep }]}>{c.status}</AppText>
@@ -171,9 +181,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  agePillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
-  petName: { color: "#FFFFFF", fontSize: 24, fontWeight: "700", marginTop: 12 },
+  agePillText: { color: colors.white, fontSize: 12, fontWeight: "700", letterSpacing: 0.5 },
+  petName: { color: colors.white, fontSize: 24, fontWeight: "700", marginTop: 12 },
   petBreed: { color: "rgba(255,255,255,0.92)", fontSize: 13, fontWeight: "500", marginTop: 4 },
+  editFab: {
+    position: "absolute",
+    top: 60,
+    right: 16,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    ...glass.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   avatarWrap: { alignItems: "center", marginTop: -56 },
   avatarCard: {

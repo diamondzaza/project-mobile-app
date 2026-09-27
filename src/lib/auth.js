@@ -3,10 +3,21 @@ import { Platform } from "react-native";
 
 import { supabase, isSupabaseConfigured } from "./supabase";
 
-/** เข้าสู่ระบบด้วยอีเมล + รหัสผ่าน (ล็อกอินด้วยเบอร์โทรถูกลบออกแล้ว) */
+/** เข้าสู่ระบบด้วยอีเมลหรือชื่อผู้ใช้ + รหัสผ่าน
+ *  ชื่อผู้ใช้: ค้นอีเมลจากตาราง users ก่อนผ่าน RPC (0005_login_by_username.sql) แล้วค่อย sign-in */
 export async function signIn(identifier, password) {
+  const id = identifier.trim();
+  let email = id;
+  if (!id.includes("@")) {
+    const { data: found, error: lookupError } = await supabase.rpc("lookup_email_by_username", {
+      p_username: id,
+    });
+    if (lookupError) throw lookupError;
+    if (!found) throw new Error("ไม่พบชื่อผู้ใช้นี้ในระบบ");
+    email = found;
+  }
   const { data, error } = await supabase.auth.signInWithPassword({
-    email: identifier.trim(),
+    email,
     password,
   });
   if (error) throw error;
@@ -71,7 +82,7 @@ export async function saveProfile(userId, patch) {
 /** แปลง error ของ Supabase เป็นข้อความไทยที่ผู้ใช้อ่านได้ */
 export function translateAuthError(message) {
   const m = String(message || "");
-  if (m.includes("Invalid login credentials")) return "อีเมล/เบอร์โทรศัพท์หรือรหัสผ่านไม่ถูกต้อง";
+  if (m.includes("Invalid login credentials")) return "อีเมล/ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง";
   if (m.includes("Email not confirmed")) return "กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ";
   if (m.includes("User already registered")) return "อีเมลนี้ถูกใช้สมัครแล้ว";
   if (m.includes("Password should be at least")) return "รหัสผ่านสั้นเกินไป";

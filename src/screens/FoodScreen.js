@@ -1,26 +1,43 @@
 /** หน้า Food */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { SafeAreaView, View, TextInput, Pressable, Image, StyleSheet, Switch } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Feather } from "@expo/vector-icons";
-import { Soup } from "lucide-react-native";
+import {
+  Soup,
+  Image as ImageIcon,
+  Sunrise,
+  Sun,
+  Moon,
+  ChevronRight,
+  Target,
+  Pencil,
+  X,
+  Plus,
+  Bell,
+  Clock,
+  Check,
+  Save,
+} from "lucide-react-native";
 
 import AppText from "../components/AppText";
 import Card from "../components/Card";
 import IconButton from "../components/IconButton";
+import Header from "../components/Header";
 import ProgressBar from "../components/ProgressBar";
 import { colors, shadow } from "../theme";
 import { isSameDate, timeAgo, formatGregorianShort } from "../utils/date";
 import { MEAL_REMINDERS, MEAL_REMINDER_HOUR_OPTIONS } from "../data/constants";
 import { parseGrams } from "../utils/parse";
-import { takePhoto, choosePhoto } from "../utils/photo";
+import { choosePhoto } from "../utils/photo";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 
+// ไอคอนมื้ออาหารมาจาก MEAL_REMINDERS เป็น string — map เป็น component lucide ที่นี่
+const MEAL_ICONS = { sunrise: Sunrise, sun: Sun, moon: Moon };
+
 const CAT = {
-  accent: "#C97B5A",
-  accentDeep: "#A8552E",
-  soft: "#F3D9C2", grad: ["#F3D9C2", "#FBE3D6"], dot: "#C97B5A",
+  accent: colors.accent,
+  accentDeep: colors.accentDeep,
+  soft: colors.greenPastel, grad: [colors.greenPastel, "#FBE3D6"], dot: colors.accent,
   tags: MEAL_REMINDERS,
   emptyTitle: "วันนี้ยังไม่ได้บันทึกมื้ออาหาร", emptySub: "พิมพ์เมนูแล้วกด + เพื่อบันทึกมื้อแรกของวัน",
   summaryLabel: "มื้อล่าสุด", footer: "เคล็ดลับ: พิมพ์กรัมเช่น \"200 กรัม\" — จะนับเข้าเป้าหมายรายวันอัตโนมัติ",
@@ -62,6 +79,8 @@ const PERIODS = [
 ];
 
 function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSetGoal, foodReminder, onSetFoodReminder }) {
+  const scrollRef = useRef(null);
+  const inputRef = useRef(null);
   const [text, setText] = useState("");
   const [activeTag, setActiveTag] = useState(CAT.tags[0].tag);
   const [period, setPeriod] = useState("today");
@@ -183,8 +202,8 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
     setPendingPhoto(null);
   };
 
-  const handlePhoto = async (mode) => {
-    const uri = mode === "camera" ? await takePhoto() : await choosePhoto();
+  const handlePhoto = async () => {
+    const uri = await choosePhoto();
     if (uri) setPendingPhoto(uri);
   };
 
@@ -242,7 +261,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
           {onEdit && (
             <IconButton icon="edit-2" size={16} color={colors.brown} accessibilityLabel="แก้ไขรายการมื้ออาหาร" onPress={() => startEdit(it)} />
           )}
-          <IconButton icon="trash-2" size={16} color="#B23A22" accessibilityLabel="ลบรายการมื้ออาหาร" onPress={() => onRemove(activePet.id, it.id)} />
+          <IconButton icon="trash-2" size={16} color={colors.danger} accessibilityLabel="ลบรายการมื้ออาหาร" onPress={() => onRemove(activePet.id, it.id)} />
         </Card>
       </Reveal>
     );
@@ -252,24 +271,16 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        <AnimatedScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-
-          <LinearGradient colors={CAT.grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-            <Pressable onPress={() => go("petProfile")} style={styles.backBtn}>
-              <Feather name="chevron-left" size={22} color={colors.textDark} />
-            </Pressable>
-            <AppText style={styles.headerTitle}>อาหาร · {activePet.name}</AppText>
-            <View style={[styles.countPill, { backgroundColor: CAT.accentDeep }]}>
-              <AppText style={styles.countText}>วันนี้ {todayCount} มื้อ</AppText>
-            </View>
-          </LinearGradient>
+        {/* Header เดียวกับหน้านัดหมาย: กลับ / ชื่อ */}
+        <Header title={`อาหารของ ${activePet.name}`} onBack={() => go("petProfile")} />
+        <AnimatedScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 32 }}>
 
 
           <Reveal>
             <Card style={[glassCardStrong, styles.goalCard]}>
               <View style={styles.goalRow}>
                 <View style={[styles.summaryIcon, { backgroundColor: CAT.soft }]}>
-                  <Feather name="target" size={18} color={CAT.accentDeep} />
+                  <Target size={18} color={CAT.accentDeep} strokeWidth={2} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <AppText style={styles.summaryLabel}>วันนี้กินไป {Math.round(todayTotal)} กรัม</AppText>
@@ -285,7 +296,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                       autoFocus
                       onSubmitEditing={saveGoal}
                     />
-                    <AppText style={styles.goalUnit}>g</AppText>
+                    <AppText style={styles.goalUnit}>กรัม</AppText>
                     <IconButton icon="check" size={16} color={CAT.accentDeep} onPress={saveGoal} />
                   </View>
                 ) : (
@@ -295,7 +306,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                     accessibilityRole="button"
                     accessibilityLabel={`แก้ไขเป้าหมายอาหารรายวัน ปัจจุบัน ${goal} กรัม`}
                   >
-                    <Feather name="edit-2" size={11} color="#FFFFFF" />
+                    <Pencil size={11} color={colors.white} strokeWidth={2} />
                     <AppText style={styles.goalPillText}>เป้า {goal} กรัม</AppText>
                     <AppText style={styles.goalEditLabel}>แก้ไข</AppText>
                   </Pressable>
@@ -309,8 +320,8 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
             <View style={styles.previewRow}>
               <View style={styles.previewWrap}>
                 <Image source={{ uri: pendingPhoto }} style={styles.pendingThumb} />
-                <Pressable onPress={() => setPendingPhoto(null)} style={styles.previewRemove}>
-                  <Feather name="x" size={13} color="#FFFFFF" />
+                <Pressable onPress={() => setPendingPhoto(null)} hitSlop={8} style={({ pressed }) => [styles.previewRemove, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="เอารูปที่แนบออก">
+                  <X size={15} color={colors.white} strokeWidth={2} />
                 </Pressable>
               </View>
               <AppText style={styles.previewHint}>รูปนี้จะแนบกับมื้อถัดไปของคุณ</AppText>
@@ -320,6 +331,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
           <View style={styles.inputRow}>
             <View style={styles.inputWrap}>
               <TextInput
+                ref={inputRef}
                 style={styles.input}
                 value={text}
                 onChangeText={setText}
@@ -327,14 +339,16 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                 placeholderTextColor={colors.textGray}
               />
             </View>
-            <Pressable onPress={() => handlePhoto("camera")} style={[styles.photoBtn, { backgroundColor: CAT.soft }]} accessibilityRole="button" accessibilityLabel="ถ่ายรูปมื้อนี้">
-              <Feather name="camera" size={18} color={CAT.accentDeep} />
+            <Pressable
+              onPress={handlePhoto}
+              style={({ pressed }) => [styles.photoBtn, { backgroundColor: CAT.soft }, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="แนบรูปมื้อนี้"
+            >
+              <ImageIcon size={18} color={CAT.accentDeep} strokeWidth={2} />
             </Pressable>
-            <Pressable onPress={() => handlePhoto("gallery")} style={[styles.photoBtn, { backgroundColor: CAT.soft }]} accessibilityRole="button" accessibilityLabel="เลือกรูปจากคลังภาพ">
-              <Feather name="image" size={18} color={CAT.accentDeep} />
-            </Pressable>
-            <Pressable onPress={handleAdd} style={[styles.addBtn, { backgroundColor: CAT.accentDeep }]} accessibilityRole="button" accessibilityLabel="บันทึกมื้อนี้">
-              <Feather name="plus" size={22} color="#FFFFFF" />
+            <Pressable onPress={handleAdd} style={({ pressed }) => [styles.addBtn, { backgroundColor: CAT.accentDeep }, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="บันทึกมื้อนี้">
+              <Plus size={22} color={colors.white} strokeWidth={2} />
             </Pressable>
           </View>
 
@@ -345,11 +359,14 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                 <Pressable
                   key={t.tag}
                   onPress={() => setActiveTag(t.tag)}
-                  style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                  style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`บันทึกเป็นมื้อ${t.label}`}
                 >
                   <View style={styles.chipInner}>
-                    <Feather name={t.icon} size={13} color={active ? "#FFFFFF" : colors.textDark} />
-                    <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                    {(() => { const MealIcon = MEAL_ICONS[t.icon] || Sunrise; return <MealIcon size={13} color={active ? colors.white : colors.textDark} strokeWidth={2} />; })()}
+                    <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                       {t.label}
                     </AppText>
                   </View>
@@ -361,18 +378,29 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
 
           {missingMeals.length > 0 && (
             <Reveal>
-              <Card style={[glassCardWarn, styles.reminderCard]}>
-                <View style={[styles.summaryIcon, { backgroundColor: "#FBEFD8" }]}>
-                  <Feather name="bell" size={18} color={CAT.accentDeep} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <AppText style={styles.summaryLabel}>เตือนมื้ออาหาร</AppText>
-                  <AppText style={styles.summarySub} numberOfLines={1}>
-                    ยังไม่ได้บันทึกมื้อ: {missingMeals.map((m) => m.label).join(" · ")}
-                  </AppText>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.textBody} />
-              </Card>
+              <Pressable
+                onPress={() => {
+                  // กดการ์ดเตือน → เลือกมื้อแรกที่ยังไม่ได้บันทึก แล้วโฟกัสช่องพิมพ์ให้เลย
+                  if (missingMeals[0]) setActiveTag(missingMeals[0].tag);
+                  inputRef.current?.focus();
+                }}
+                style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`เลือกบันทึกมื้อ${missingMeals[0]?.label || ""}ที่ยังไม่ได้บันทึก`}
+              >
+                <Card style={[glassCardWarn, styles.reminderCard]}>
+                  <View style={[styles.summaryIcon, { backgroundColor: "#FBEFD8" }]}>
+                    <Bell size={18} color={CAT.accentDeep} strokeWidth={2} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <AppText style={styles.summaryLabel}>เตือนมื้ออาหาร</AppText>
+                    <AppText style={styles.summarySub} numberOfLines={1}>
+                      ยังไม่ได้บันทึกมื้อ: {missingMeals.map((m) => m.label).join(" · ")}
+                    </AppText>
+                  </View>
+                  <ChevronRight size={18} color={colors.textBody} strokeWidth={2} />
+                </Card>
+              </Pressable>
             </Reveal>
           )}
 
@@ -381,7 +409,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
               <Card style={[glassCard, styles.foodReminderCard]}>
                 <View style={[styles.goalRow, styles.reminderRowFirst]}>
                   <View style={[styles.summaryIcon, { backgroundColor: CAT.soft }]}>
-                    <Feather name="bell" size={18} color={CAT.accentDeep} />
+                    <Bell size={18} color={CAT.accentDeep} strokeWidth={2} />
                   </View>
                   <View style={{ flex: 1, marginLeft: 12 }}>
                     <AppText style={styles.summaryLabel}>แจ้งเตือนการให้อาหาร</AppText>
@@ -395,7 +423,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                     value={reminderOn}
                     onValueChange={(v) => onSetFoodReminder(activePet.id, { on: v })}
                     trackColor={{ true: CAT.accentDeep, false: "rgba(90,52,25,0.2)" }}
-                    thumbColor="#FFFFFF"
+                    thumbColor={colors.white}
                     accessibilityLabel="เปิด/ปิดแจ้งเตือนการให้อาหาร"
                   />
                 </View>
@@ -409,14 +437,14 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                           <Pressable
                             key={m.tag}
                             onPress={() => setMealDraft((prev) => ({ ...prev, [m.tag]: !prev[m.tag] }))}
-                            style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                            style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                             accessibilityLabel={`เลือกแจ้งเตือนมื้อ${m.label}`}
                           >
                             <View style={styles.chipInner}>
-                              <Feather name={m.icon} size={13} color={active ? "#FFFFFF" : colors.textDark} />
-                              <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                              {(() => { const MealIcon = MEAL_ICONS[m.icon] || Sunrise; return <MealIcon size={13} color={active ? colors.white : colors.textDark} strokeWidth={2} />; })()}
+                              <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                                 {m.label}
                               </AppText>
                             </View>
@@ -432,12 +460,12 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                           <Pressable
                             key={oh}
                             onPress={() => setHourDraft(oh)}
-                            style={[styles.chip, styles.timeChip, active ? styles.chipActive : styles.chipGlass]}
+                            style={({ pressed }) => [styles.chip, styles.timeChip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                             accessibilityRole="button"
                             accessibilityState={{ selected: active }}
                             accessibilityLabel={`ตั้งเวลาแจ้งเตือน ${oh}:00`}
                           >
-                            <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                            <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                               {String(oh).padStart(2, "0")}:00
                             </AppText>
                           </Pressable>
@@ -447,11 +475,11 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                     <Pressable
                       onPress={saveMeals}
                       disabled={!mealsDirty}
-                      style={[styles.saveMealsBtn, !mealsDirty && !showSaved && styles.saveMealsBtnDisabled]}
+                      style={({ pressed }) => [styles.saveMealsBtn, !mealsDirty && !showSaved && styles.saveMealsBtnDisabled, pressed && { opacity: 0.85 }]}
                       accessibilityRole="button"
                       accessibilityLabel="บันทึกมื้อและเวลาที่เลือก"
                     >
-                      <Feather name={showSaved ? "check" : "save"} size={15} color="#FFFFFF" />
+                      {showSaved ? <Check size={15} color={colors.white} strokeWidth={2} /> : <Save size={15} color={colors.white} strokeWidth={2} />}
                       <AppText style={styles.saveMealsText}>{showSaved ? "บันทึกแล้ว" : "บันทึก"}</AppText>
                     </Pressable>
                   </>
@@ -461,6 +489,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
           )}
 
 
+          <AppText style={styles.mealSelectTitle}>ช่วงเวลา</AppText>
           <View style={styles.chipsRow}>
             {PERIODS.map((p) => {
               const active = period === p.key;
@@ -468,9 +497,12 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                 <Pressable
                   key={p.key}
                   onPress={() => setPeriod(p.key)}
-                  style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                  style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: active }}
+                  accessibilityLabel={`ช่วงบันทึก: ${p.label}`}
                 >
-                  <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                  <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                     {p.label}
                   </AppText>
                 </Pressable>
@@ -495,7 +527,7 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                       <Image source={{ uri: lastItem.photo }} style={styles.summaryThumb} />
                     ) : (
                       <View style={[styles.summaryIcon, { backgroundColor: CAT.soft }]}>
-                        <Feather name="clock" size={18} color={CAT.accentDeep} />
+                        <Clock size={18} color={CAT.accentDeep} strokeWidth={2} />
                       </View>
                     )}
                     <View style={{ flex: 1, marginLeft: 12 }}>
@@ -536,15 +568,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+    ...shadow,
   },
-  backBtn: { padding: 6 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.textDark, marginLeft: 4 },
-  countPill: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, ...shadow },
-  countText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 
   goalCard: { marginHorizontal: 20, marginTop: 16, padding: 14 },
   goalRow: { flexDirection: "row", alignItems: "center", marginBottom: 12 },
@@ -552,13 +586,13 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 5,
     backgroundColor: CAT.accentDeep, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6,
   },
-  goalPillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
-  goalEditLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "400" },
+  goalPillText: { color: colors.white, fontSize: 12, fontWeight: "700" },
+  goalEditLabel: { color: colors.white, fontSize: 12, fontWeight: "400" },
   goalEditRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   goalInput: {
     width: 70, height: 34, backgroundColor: colors.cardBg, borderRadius: 10,
     borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8,
-    fontSize: 14, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular", textAlign: "center",
+    fontSize: 14, color: colors.textDark, fontFamily: "Kanit_400Regular", textAlign: "center",
   },
   goalUnit: { fontSize: 13, fontWeight: "500", color: colors.textGray },
 
@@ -578,13 +612,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     justifyContent: "center",
   },
-  input: { fontSize: 15, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular" },
+  input: { fontSize: 15, color: colors.textDark, fontFamily: "Kanit_400Regular" },
   photoBtn: { width: 42, height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center" },
   addBtn: { width: 50, height: 50, borderRadius: 14, alignItems: "center", justifyContent: "center", marginLeft: 10, ...shadow },
   previewRow: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, marginTop: 12, gap: 10 },
   previewWrap: { width: 54, height: 54 },
   previewRemove: {
-    position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: 10,
+    position: "absolute", top: -8, right: -8, width: 32, height: 32, borderRadius: 16,
     backgroundColor: colors.red, alignItems: "center", justifyContent: "center",
   },
   previewHint: { flex: 1, fontSize: 12, fontWeight: "400", color: colors.textGray },
@@ -593,7 +627,7 @@ const styles = StyleSheet.create({
   summaryThumb: { width: 38, height: 38, borderRadius: 12 },
 
   chipsRow: { flexDirection: "row", paddingHorizontal: 20, marginTop: 12, gap: 8, flexWrap: "wrap" },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+  chip: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 999 },
   chipInner: { flexDirection: "row", alignItems: "center", gap: 5 },
  
   chipGlass: {
@@ -610,13 +644,13 @@ const styles = StyleSheet.create({
   reminderRowFirst: { marginBottom: 0 },
   mealSelectTitle: { fontSize: 13, fontWeight: "600", color: colors.textDark, marginTop: 12 },
   mealSelectRow: { flexDirection: "row", gap: 8, flexWrap: "wrap", marginTop: 8 },
-  timeChip: { paddingHorizontal: 10, paddingVertical: 5 },
+  timeChip: { paddingHorizontal: 10 },
   saveMealsBtn: {
     flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
     backgroundColor: CAT.accentDeep, borderRadius: 12, paddingVertical: 10, marginTop: 12, ...shadow,
   },
   saveMealsBtnDisabled: { opacity: 0.45 },
-  saveMealsText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  saveMealsText: { color: colors.white, fontSize: 14, fontWeight: "700" },
   summaryCard: { marginHorizontal: 20, marginTop: 16, padding: 14, flexDirection: "row", alignItems: "center" },
 
   empty: { alignItems: "center", paddingVertical: 50 },
@@ -627,7 +661,7 @@ const styles = StyleSheet.create({
   listWrap: { marginTop: 14, paddingHorizontal: 20 },
   dayHeader: { fontSize: 13, fontWeight: "600", color: colors.textBody, marginBottom: 10, marginTop: 4 },
   row: { flexDirection: "row", alignItems: "center", marginBottom: 12, paddingVertical: 12 },
-  editInput: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular", paddingVertical: 4, marginRight: 4 },
+  editInput: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "Kanit_400Regular", paddingVertical: 4, marginRight: 4 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   rowTitle: { fontSize: 15, fontWeight: "600", color: colors.textDark },
   rowSub: { fontSize: 12, fontWeight: "400", color: colors.textBody, marginTop: 2 },

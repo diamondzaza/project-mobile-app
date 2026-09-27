@@ -4,10 +4,14 @@ node_modules/
 # Expo
 .expo/
 .expo-shared/
+.expo-export-check/
 dist/
 web-build/
 expo-env.d.ts
 *.tsbuildinfo
+
+# Playwright MCP (ภาพ/snapshot จากการทดสอบ)
+.playwright-mcp/
 
 # Supabase CLI (ข้อมูลเชื่อมเครื่องนี้)
 supabase/.temp/

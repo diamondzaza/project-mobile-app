@@ -14,8 +14,16 @@ export const colors = {
   border: "rgba(255,255,255,0.55)",
   textDark: "#5A3419",
   textBody: "#5E3F26",
-  textGray: "#5E3F26",
+  // ข้อความรอง — ต้องจางกว่า textBody จริง (เดิมซ้ำกับ textBody ทำ hierarchy สีพังทั้งแอป)
+  textGray: "#8A6E56",
   red: "#D9614A",
+  // semantic tokens — สีที่ถูกใช้จริงแต่เคย hard-code กระจาย 10+ ไฟล์
+  accentDeep: "#A8552E",
+  danger: "#B23A22",
+  success: "#3E7A50",
+  white: "#FFFFFF",
+  // track ของ ProgressBar — เห็นบนพื้นทั้งสีและขาวโปร่ง (เดิมใช้ขาวโปร่งซึ่งหายบนการ์ดขาว)
+  trackBg: "rgba(0,0,0,0.08)",
 };
 
 
@@ -24,6 +32,13 @@ export const category = {
   food: { main: "#C97B5A", soft: "#F3D9C2" },
   activity: { main: "#C8924A", soft: "#F3E2C8" },
   appointments: { main: "#8A6FB0", soft: "#EDE3F3" },
+};
+
+// สีการ์ดแพ็กเกจสมาชิก — Plus = gradient เงิน, Premium = gradient ทอง (แกมสว่างเพื่อให้ textDark อ่านออก)
+export const tierTint = {
+  standard: { bg: "#FFF6EE", border: colors.accent },
+  plus: { bg: "#EDEEF3", border: "#B9BDCB", gradient: ["#FBFCFE", "#E9EBF2", "#D8DCE6"] },
+  premium: { bg: "#FDF3D2", border: "#D9BC6A", gradient: ["#FFF9E6", "#F6E7B2", "#EBD285"] },
 };
 
 

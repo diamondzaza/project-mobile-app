@@ -41,6 +41,8 @@ function WelcomeScreen({ go }) {
           <GradientSurface variant="hero" style={styles.illustrationWrap}>
             {slide.image ? (
               <Image source={slide.image} style={styles.slideImage} resizeMode="contain" />
+            ) : slide.icon ? (
+              <slide.icon size={72} color={colors.accentDeep} strokeWidth={1.6} />
             ) : (
               <View style={styles.imagePlaceholder} />
             )}
@@ -49,33 +51,33 @@ function WelcomeScreen({ go }) {
           <AppText style={styles.subtitle}>{slide.subtitle}</AppText>
         </Animated.View>
 
-        <View style={styles.dotsRow}>
-          {slides.map((_, i) => (
-            <Pressable key={i} onPress={() => setSlideIndex(i)} hitSlop={8}>
-              <View style={[styles.dot, i === slideIndex && styles.dotActive]} />
-            </Pressable>
-          ))}
-        </View>
+        {/* สไลด์เดียวไม่ต้องมีจุดบอกตำแหน่ง */}
+        {slides.length > 1 && (
+          <View style={styles.dotsRow}>
+            {slides.map((_, i) => (
+              <Pressable
+                key={i}
+                onPress={() => setSlideIndex(i)}
+                style={({ pressed }) => [styles.dotHit, pressed && { opacity: 0.85 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`ไปสไลด์ที่ ${i + 1}`}
+              >
+                <View style={[styles.dot, i === slideIndex && styles.dotActive]} />
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <View style={{ flexDirection: "row", alignItems: "center", gap: 12, marginTop: 24 }}>
           {!isLast && (
-            <Pressable onPress={() => go("login")} hitSlop={8}>
-              <AppText
-                style={{
-                  color: colors.textBody,
-                  textDecorationLine: "underline",
-                  fontWeight: "600",
-                  fontSize: 15,
-                }}
-              >
-                ข้าม
-              </AppText>
+            <Pressable onPress={() => go("login")} style={({ pressed }) => [styles.skipBtn, pressed && { opacity: 0.85 }]}>
+              <AppText style={styles.skipText}>ข้าม</AppText>
             </Pressable>
           )}
           <Button
             title={isLast ? "เริ่มใช้งาน" : "ถัดไป"}
             onPress={goToNext}
-            style={{ width: isLast ? 220 : 140 }}
+            style={styles.nextBtn}
           />
         </View>
       </View>
@@ -91,9 +93,15 @@ const styles = StyleSheet.create({
   imagePlaceholder: { width: 200, height: 200, borderRadius: 100, backgroundColor: "rgba(255,255,255,0.25)" },
   title: { fontSize: 28, fontWeight: "700", color: colors.textDark, textAlign: "center", marginBottom: 12 },
   subtitle: { fontSize: 14, fontWeight: "400", color: colors.textGray, textAlign: "center", lineHeight: 22, marginBottom: 24 },
-  dotsRow: { flexDirection: "row", gap: 6 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "rgba(255,255,255,0.6)" },
+  // ครอบจุดด้วยพื้นที่แตะ 44x44 (จุดวาดกลาง) — gap 0 เพราะช่องแตะกว้างพอแล้ว
+  dotsRow: { flexDirection: "row" },
+  dotHit: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  // dot ไม่ active สีเข้มจาง (brown ที่ opacity 0.3) ให้เห็นบนพื้นอ่อน
+  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brown, opacity: 0.3 },
   dotActive: { backgroundColor: colors.greenDark, width: 20 },
+  skipBtn: { minWidth: 44, minHeight: 44, alignItems: "center", justifyContent: "center" },
+  skipText: { color: colors.textBody, textDecorationLine: "underline", fontWeight: "600", fontSize: 15 },
+  nextBtn: { paddingHorizontal: 32 },
 });
 
 export default WelcomeScreen;

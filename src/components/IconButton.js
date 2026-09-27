@@ -1,19 +1,19 @@
-/** ปุ่มไอคอนวงกลม **/
+/** ปุ่มไอคอนวงกลม — วาดด้วย lucide ผ่าน iconMap (รับชื่อเดิมหรือ component ก็ได้) */
 import { Pressable, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
 
 import { colors, radius, glass } from "../theme";
-
+import { resolveIcon } from "./iconMap";
 
 export default function IconButton({ icon, onPress, size = 20, color = colors.brown, style, accessibilityLabel }) {
+  const IconComp = resolveIcon(icon);
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel || icon}
-      style={[styles.iconButton, glass.warm, style]}
+      style={({ pressed }) => [styles.iconButton, glass.warm, pressed && { opacity: 0.8 }, style]}
     >
-      <Feather name={icon} size={size} color={color} />
+      {IconComp ? <IconComp size={size} color={color} strokeWidth={2} /> : null}
     </Pressable>
   );
 }

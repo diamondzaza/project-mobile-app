@@ -127,13 +127,21 @@ export function markNoteReminded(id) {
 
 /* ---------- สุขภาพ (health_tasks) ---------- */
 
-export async function insertHealthItem(userId, petId, item) {
+export async function insertHealthItem(userId, petId, item, photoPath) {
   const { error } = await supabase.from("health_tasks").insert({
     id: item.id, // ใช้ id เดียวกับแอป เพื่อให้ completeHealthItem อ้างถูกแถว
     pet_id: petId,
     user_id: userId,
     title: item.title,
-    due_text: item.date || null, // วันที่แบบข้อความ (หน้า Health ยังไม่มีปฏิทิน)
+    due_date: item.dueDate || null, // วันที่จริงจากปฏิทิน (YYYY-MM-DD)
+    due_text: item.date || null, // legacy — ข้อความวันที่แบบเก่า
+    category: item.category || null,
+    clinic: item.clinic || null,
+    vet_name: item.vetName || null,
+    price: item.price != null && item.price !== "" ? Number(item.price) : null,
+    notes: item.notes || null,
+    remind_days_before: item.remindDaysBefore ?? 3,
+    ...(photoPath ? { photo_path: photoPath } : {}),
   });
   if (error) throw error;
 }

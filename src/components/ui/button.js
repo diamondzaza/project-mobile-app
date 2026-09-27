@@ -6,11 +6,11 @@ import AppText from "../AppText";
 
 
 const VARIANTS = {
-  default: { backgroundColor: "#A8552E", color: "#FFFFFF", borderWidth: 0, glass: false },
+  default: { backgroundColor: colors.accentDeep, color: colors.white, borderWidth: 0, glass: false },
   secondary: { backgroundColor: "rgba(232,196,160,0.42)", color: colors.textDark, borderWidth: 1, glass: true },
   outline: { backgroundColor: "transparent", color: colors.textDark, borderWidth: 1, glass: true },
   ghost: { backgroundColor: "transparent", color: colors.textDark, borderWidth: 0, glass: false },
-  destructive: { backgroundColor: "#B23A22", color: "#FFFFFF", borderWidth: 0, glass: false },
+  destructive: { backgroundColor: colors.danger, color: colors.white, borderWidth: 0, glass: false },
 };
 
 const webInset = Platform.select({
@@ -52,7 +52,19 @@ export function Button({
     <Pressable
       onPress={onPress}
       disabled={disabled}
-      style={[styles.base, s, { backgroundColor: v.backgroundColor, borderWidth: v.borderWidth, borderColor: "rgba(255,255,255,0.55)" }, v.glass ? glass.surface : webInset, disabled && { opacity: 0.5 }, style]}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
+      // size sm สูง 38 — เติม hitSlop ให้พื้นที่แตะรวม >= 44pt
+      hitSlop={s.height < 44 ? { top: 3, bottom: 3, left: 2, right: 2 } : undefined}
+      style={({ pressed }) => [
+        styles.base,
+        s,
+        { backgroundColor: v.backgroundColor, borderWidth: v.borderWidth, borderColor: "rgba(255,255,255,0.55)" },
+        v.glass ? glass.surface : webInset,
+        disabled && { opacity: 0.5 },
+        !disabled && pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] },
+        style,
+      ]}
       {...props}
     >
       {iconLeft}

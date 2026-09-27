@@ -1,6 +1,6 @@
 /** หน้าหลักแสดง grid การ์ดสัตว์เลี้ยง  */
 import { SafeAreaView, View, Pressable, Image, StyleSheet } from "react-native";
-import { Plus, Calendar, TrendingUp } from "lucide-react-native";
+import { Plus, Calendar, TrendingUp, PawPrint, Trash2 } from "lucide-react-native";
 
 import AppText from "../components/AppText";
 import BottomTabBar, { TAB_BAR_CLEARANCE } from "../components/BottomTabBar";
@@ -8,27 +8,14 @@ import GradientSurface from "../components/GradientSurface";
 import PetIcon from "../components/PetIcon";
 import Card from "../components/Card";
 import AdBanner from "../components/AdBanner";
-import { colors, radius, shadow, shadowLg } from "../theme";
+import { colors, glass, radius, shadow, shadowLg } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 import { confirmDialog } from "../utils/confirm";
-import { AD_LEVELS } from "../data/constants";
+import { AD_LEVELS, PET_LIMITS } from "../data/constants";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 import useHideOnScrollBar from "../components/useHideOnScrollBar";
 
-
-const glassCard = {
-  backgroundColor: "rgba(255,255,255,0.72)",
-  borderColor: "rgba(255,255,255,0.5)",
-  borderWidth: 1,
-  shadowColor: "#000000",
-  shadowOffset: { width: 0, height: 4 },
-  shadowOpacity: 0.1,
-  shadowRadius: 20,
-  elevation: 5,
-};
-
-const accentDeep = "#A8552E";
 
 function latestWeight(weightData, id) {
   const arr = weightData?.[id] || [];
@@ -38,11 +25,11 @@ function latestWeight(weightData, id) {
   return `${value} kg`;
 }
 
-function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standard" }) {
+function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standard", unreadCount = 0 }) {
   const tabBar = useHideOnScrollBar();
   const adLevel = AD_LEVELS[tier] ?? "banner";
   const confirmRemove = (pet) => {
-  
+
     confirmDialog({
       title: "ลบสัตว์เลี้ยง",
       message: `ต้องการลบ ${pet.name} ใช่ไหม?`,
@@ -50,6 +37,21 @@ function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standa
       destructive: true,
       onConfirm: () => removePet(pet.id),
     });
+  };
+
+  // กดปุ่มเพิ่มสัตว์ — ถ้าครบจำนวนตามแพ็กเกจแล้ว แจ้งเตือนทันทีพร้อมชวนอัปเกรด
+  const pressAdd = () => {
+    const limit = PET_LIMITS[tier];
+    if (limit != null && pets.length >= limit) {
+      confirmDialog({
+        title: "จำนวนสัตว์เลี้ยงเต็มตามแพ็กเกจ",
+        message: `แพ็กเกจ ${tier.toUpperCase()} รองรับสูงสุด ${limit} ตัว (ขณะนี้มี ${pets.length} ตัว)\nอัปเกรดแพ็กเกจเพื่อเพิ่มสัตว์เลี้ยงได้ที่ "แพ็กเกจของฉัน"`,
+        confirmText: "ดูแพ็กเกจ",
+        onConfirm: () => go("subscription"),
+      });
+      return;
+    }
+    go("addPet");
   };
 
   return (
@@ -65,16 +67,38 @@ function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standa
             <AdBanner level={adLevel} onPressUpgrade={() => go("subscription")} />
           </Reveal>
         )}
+        {pets.length === 0 && (
+          <Reveal>
+            <View style={styles.welcomeBox}>
+              <View style={styles.welcomeCircle}>
+                <PawPrint size={30} color={colors.accentDeep} strokeWidth={2} />
+              </View>
+              <AppText style={styles.welcomeTitle}>เริ่มต้นเพิ่มสัตว์เลี้ยงตัวแรก</AppText>
+              <AppText style={styles.welcomeSub}>บันทึกสุขภาพ อาหาร และกิจกรรมของเพื่อนสี่ขาได้ที่นี่</AppText>
+            </View>
+          </Reveal>
+        )}
         <View style={styles.petGrid}>
           {pets.map((item) => (
             <Reveal key={item.id} style={styles.petCardWrapper}>
               <Pressable
                 onPress={() => selectPet(item.id)}
                 onLongPress={() => confirmRemove(item)}
+                style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
                 accessibilityRole="button"
                 accessibilityLabel={`${item.name}, ${item.breed}, ${item.age}, ${latestWeight(weightData, item.id)}. แตะเพื่อเปิดโปรไฟล์ กดค้างเพื่อลบ`}
               >
-                <Card style={[glassCard, styles.petCard]}>
+                <Card style={[glass.surface, styles.petCard]}>
+                  {/* ปุ่มลบมุมการ์ด — ทางลบที่มองเห็นได้ นอกจากการกดค้าง */}
+                  <Pressable
+                    onPress={() => confirmRemove(item)}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.85 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel={`ลบ ${item.name}`}
+                  >
+                    <Trash2 size={15} color={colors.danger} strokeWidth={2} />
+                  </Pressable>
                   <View style={styles.avatarWrap}>
                     {item.photo ? (
                       <Image source={{ uri: item.photo }} style={styles.petPhoto} resizeMode="cover" />
@@ -100,10 +124,15 @@ function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standa
           ))}
 
           <Reveal style={styles.petCardWrapper}>
-            <Pressable onPress={() => go("addPet")} accessibilityRole="button" accessibilityLabel="เพิ่มสัตว์เลี้ยงใหม่">
+            <Pressable
+              onPress={pressAdd}
+              style={({ pressed }) => [pressed && { opacity: 0.85, transform: [{ scale: 0.98 }] }]}
+              accessibilityRole="button"
+              accessibilityLabel="เพิ่มสัตว์เลี้ยงใหม่"
+            >
               <View style={styles.addCard}>
                 <View style={styles.addCircle}>
-                  <Plus size={32} color={accentDeep} strokeWidth={2.4} />
+                  <Plus size={32} color={colors.accentDeep} strokeWidth={2.4} />
                 </View>
                 <AppText style={styles.addLabel}>เพิ่มสัตว์เลี้ยงใหม่</AppText>
               </View>
@@ -111,14 +140,14 @@ function HomeScreen({ go, pets, weightData, selectPet, removePet, tier = "standa
           </Reveal>
         </View>
       </AnimatedScrollView>
-      <BottomTabBar active="home" go={go} anim={tabBar.anim} />
+      <BottomTabBar active="home" go={go} anim={tabBar.anim} unreadCount={unreadCount} />
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 16 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: colors.textDark },
+  headerTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark },
   petGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", paddingTop: 14 },
   petCardWrapper: { width: "48%", marginBottom: 18 },
   petCard: { alignItems: "center", paddingVertical: 18, paddingHorizontal: 12 },
@@ -144,7 +173,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 2,
     borderStyle: "dashed",
-    borderColor: "rgba(168,85,46,0.9)",
+    borderColor: colors.accentDeep,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 18,
@@ -160,7 +189,17 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginBottom: 10,
   },
-  addLabel: { fontSize: 14, fontWeight: "600", color: accentDeep },
+  addLabel: { fontSize: 14, fontWeight: "600", color: colors.accentDeep },
+  // ปุ่มลบมุมการ์ดสัตว์เลี้ยง
+  removeBtn: { position: "absolute", top: 6, right: 6, width: 28, height: 28, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+  // กล่องต้อนรับตอนยังไม่มีสัตว์เลี้ยง
+  welcomeBox: { alignItems: "center", paddingVertical: 22, paddingHorizontal: 16, marginBottom: 6, borderRadius: radius.md, ...glass.surface },
+  welcomeCircle: {
+    width: 64, height: 64, borderRadius: radius.full, backgroundColor: colors.cardTanBg,
+    alignItems: "center", justifyContent: "center", marginBottom: 10,
+  },
+  welcomeTitle: { fontSize: 16, fontWeight: "700", color: colors.textDark, marginBottom: 4 },
+  welcomeSub: { fontSize: 13, fontWeight: "400", color: colors.textBody, textAlign: "center", maxWidth: 260 },
 });
 
 export default HomeScreen;

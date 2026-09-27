@@ -1,20 +1,16 @@
-/** การ์ดหลัก */
-import { View, StyleSheet } from "react-native";
+/** การ์ดหลัก — ครอบ ui/Card (แหล่งเดียวของแอป) โดยใส่ padding 16 ให้เหมือนพฤติกรรมเดิม */
+import { StyleSheet } from "react-native";
 
-import { radius, glass } from "../theme";
+import { Card as UICard } from "./ui/card";
 
 export default function Card({ children, style, tan }) {
   return (
-    <View style={[styles.card, tan ? glass.warm : null, style]}>
+    <UICard tan={tan} style={[styles.card, style]}>
       {children}
-    </View>
+    </UICard>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: radius.md,
-    padding: 16,
-    ...glass.surface,
-  },
+  card: { padding: 16 },
 });

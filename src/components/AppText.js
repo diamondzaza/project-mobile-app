@@ -1,28 +1,12 @@
-import { Platform, StyleSheet, Text } from "react-native";
+/** ระบบตัวอักษรกลาง: Kanit ทั้งไทย/ละติน — weight mapping จุดเดียว */
+import { StyleSheet, Text } from "react-native";
 
-const THAI = /[฀-๿]/;
-
-const IS_WEB = Platform.OS === "web";
-
-const BALOO = {
-  400: "Baloo2_400Regular",
-  500: "Baloo2_500Medium",
-  600: "Baloo2_600SemiBold",
-  700: "Baloo2_700Bold",
-};
-
-const BAI = {
-  400: "BaiJamjuree_400Regular",
-  500: "BaiJamjuree_500Medium",
-  600: "BaiJamjuree_600SemiBold",
-  700: "BaiJamjuree_700Bold",
-};
-
-const QUICKSAND = {
-  400: "Quicksand_400Regular",
-  500: "Quicksand_500Medium",
-  600: "Quicksand_600SemiBold",
-  700: "Quicksand_700Bold",
+const KANIT = {
+  300: "Kanit_300Light",
+  400: "Kanit_400Regular",
+  500: "Kanit_500Medium",
+  600: "Kanit_600SemiBold",
+  700: "Kanit_700Bold",
 };
 
 function resolveWeight(value) {
@@ -30,6 +14,7 @@ function resolveWeight(value) {
   if (value === "normal") return 400;
   const n = typeof value === "number" ? value : parseInt(value, 10);
   if (!n || Number.isNaN(n)) return 400;
+  if (n <= 350) return 300;
   if (n <= 450) return 400;
   if (n <= 550) return 500;
   if (n <= 650) return 600;
@@ -44,23 +29,14 @@ function collectText(node) {
   return "";
 }
 
-function pickFamily(weight, hasThai) {
-  if (IS_WEB) {
-    return hasThai
-      ? `${BAI[weight]}, BaiJamjuree, sans-serif`
-      : `${BALOO[weight]}, ${QUICKSAND[weight]}, sans-serif`;
-  }
-  return hasThai ? BAI[weight] : BALOO[weight];
-}
-
 export default function AppText({ style, children, ...rest }) {
   const flat = style ? StyleSheet.flatten(style) || {} : {};
-  const text = collectText(children);
   const weight = resolveWeight(flat.fontWeight);
-  const hasThai = THAI.test(text);
-  const fontFamily = pickFamily(weight, hasThai);
-  const fontSize = flat.fontSize || 14;
-  const lineHeight = flat.lineHeight || Math.round(fontSize * 1.5);
+  const fontFamily = KANIT[weight];
+  // ขนาดต่ำสุด 12pt — ตัวอักษรเล็กกว่านี้อ่านยากบนมือถือ (เดิมมี 10.5/11/11.5 หลุดมาในบางหน้า)
+  const fontSize = Math.max(12, flat.fontSize || 14);
+  // สเกลมืออาชีพ: หัวข้อใหญ่ 1.3 / เนื้อความ 1.55
+  const lineHeight = flat.lineHeight || Math.round(fontSize * (fontSize >= 18 ? 1.3 : 1.55));
   const { fontFamily: _ignored, fontWeight: _weight, ...restStyle } = flat;
 
   return (

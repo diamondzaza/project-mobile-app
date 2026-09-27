@@ -1,6 +1,6 @@
 /** หน้าการแจ้งเตือน */
-import { SafeAreaView, View, Pressable } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { SafeAreaView, View, Pressable, ActivityIndicator, StyleSheet } from "react-native";
+import { Bell, Calendar, TrendingUp, Heart, Activity, Coffee, FileText, ChevronRight } from "lucide-react-native";
 
 import Card from "../components/Card";
 import AppText from "../components/AppText";
@@ -14,7 +14,12 @@ import useHideOnScrollBar from "../components/useHideOnScrollBar";
 import { colors, category, radius } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 
-const styles = { markAll: { fontSize: 13, fontWeight: "600", color: colors.accent } };
+const styles = StyleSheet.create({
+  markAll: { fontSize: 13, fontWeight: "600", color: colors.accent },
+  loadingWrap: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 48 },
+  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.accentDeep, marginRight: 6 },
+  titleRow: { flexDirection: "row", alignItems: "center" },
+});
 
 
 const CATEGORY_BY_SCREEN = {
@@ -29,27 +34,27 @@ const CATEGORY_BY_SCREEN = {
 
 
 const ICON_BY_SCREEN = {
-  food: "coffee",
-  petAppointments: "calendar",
-  appointments: "calendar",
-  weight: "trending-up",
-  health: "heart",
-  activity: "activity",
-  activityLog: "activity",
-  notes: "file-text",
+  food: Coffee,
+  petAppointments: Calendar,
+  appointments: Calendar,
+  weight: TrendingUp,
+  health: Heart,
+  activity: Activity,
+  activityLog: Activity,
+  notes: FileText,
 };
 
 function metaFor(screen) {
   const catKey = CATEGORY_BY_SCREEN[screen];
-  const icon = ICON_BY_SCREEN[screen] || "bell";
+  const Icon = ICON_BY_SCREEN[screen] || Bell;
   if (catKey) {
     const c = category[catKey];
-    return { icon, bg: c.soft, color: c.main };
+    return { Icon, bg: c.soft, color: c.main };
   }
-  return { icon, bg: colors.greenPastel, color: colors.brown };
+  return { Icon, bg: colors.greenPastel, color: colors.brown };
 }
 
-function NotificationsScreen({ go, notifications, onOpen, removeNotification, onMarkAllRead }) {
+function NotificationsScreen({ go, notifications, onOpen, removeNotification, onMarkAllRead, loading = false }) {
   const tabBar = useHideOnScrollBar();
   const unreadCount = notifications.filter((n) => !n.read).length;
   return (
@@ -58,7 +63,7 @@ function NotificationsScreen({ go, notifications, onOpen, removeNotification, on
         title="การแจ้งเตือน"
         right={
           onMarkAllRead && unreadCount > 0 ? (
-            <Pressable onPress={onMarkAllRead} hitSlop={8}>
+            <Pressable onPress={onMarkAllRead} hitSlop={{ top: 12, bottom: 12, left: 16, right: 16 }} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
               <AppText style={styles.markAll}>อ่านทั้งหมด</AppText>
             </Pressable>
           ) : undefined
@@ -68,44 +73,59 @@ function NotificationsScreen({ go, notifications, onOpen, removeNotification, on
         onScroll={tabBar.onScroll}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: TAB_BAR_CLEARANCE }}
       >
-        {notifications.length === 0 && <EmptyState category="notifications" />}
-        {notifications.map((n) => {
-          const meta = metaFor(n.screen);
-          return (
-            <Reveal key={n.id}>
-              <Pressable onPress={() => onOpen(n)}>
-                <Card
-                  style={{
-                    marginBottom: 12,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    opacity: n.read ? 0.55 : 1,
-                  }}
-                >
-                  <View
-                    style={[sharedStyles.iconWrap, { backgroundColor: meta.bg }]}
-                  >
-                    <Feather name={meta.icon} size={20} color={meta.color} />
-                  </View>
-                  <View style={{ marginLeft: 14, flex: 1 }}>
-                    <AppText
-                      style={[sharedStyles.rowTitle, { fontWeight: "600" }]}
+        {loading ? (
+          // กำลังโหลดจาก Supabase — แสดง spinner กลางจอแทนลิสต์
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator size="large" color={colors.accentDeep} />
+          </View>
+        ) : (
+          <>
+            {notifications.length === 0 && <EmptyState category="notifications" />}
+            {notifications.map((n) => {
+              const { Icon, bg, color } = metaFor(n.screen);
+              return (
+                <Reveal key={n.id}>
+                  <Pressable onPress={() => onOpen(n)} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
+                    <Card
+                      style={{
+                        marginBottom: 12,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        opacity: n.read ? 0.55 : 1,
+                      }}
                     >
-                      {n.title}
-                    </AppText>
-                    <AppText style={[sharedStyles.rowDate, { fontWeight: "400" }]}>
-                      {n.time}
-                      {n.read ? " · อ่านแล้ว" : ""}
-                    </AppText>
-                  </View>
-                  <IconButton icon="x" color={colors.red} onPress={() => removeNotification(n.id)} />
-                </Card>
-              </Pressable>
-            </Reveal>
-          );
-        })}
+                      <View
+                        style={[sharedStyles.iconWrap, { backgroundColor: bg }]}
+                      >
+                        <Icon size={20} color={color} strokeWidth={2} />
+                      </View>
+                      <View style={{ marginLeft: 14, flex: 1 }}>
+                        <View style={styles.titleRow}>
+                          {!n.read && <View style={styles.unreadDot} />}
+                          <AppText
+                            style={[sharedStyles.rowTitle, { fontWeight: "600", flex: 1 }]}
+                            numberOfLines={1}
+                          >
+                            {n.title}
+                          </AppText>
+                        </View>
+                        <AppText style={[sharedStyles.rowDate, { fontWeight: "400" }]}>
+                          {n.time}
+                          {n.read ? " · อ่านแล้ว" : ""}
+                        </AppText>
+                      </View>
+                      {/* ลูกศรบอกว่าการ์ดแตะได้ */}
+                      <ChevronRight size={18} color={colors.textGray} strokeWidth={2} />
+                      <IconButton icon="x" color={colors.red} onPress={() => removeNotification(n.id)} />
+                    </Card>
+                  </Pressable>
+                </Reveal>
+              );
+            })}
+          </>
+        )}
       </AnimatedScrollView>
-      <BottomTabBar active="notifications" go={go} anim={tabBar.anim} />
+      <BottomTabBar active="notifications" go={go} anim={tabBar.anim} unreadCount={unreadCount} />
     </SafeAreaView>
   );
 }

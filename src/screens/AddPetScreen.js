@@ -13,6 +13,8 @@ import { colors, radius } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
+import { confirmDialog } from "../utils/confirm";
+import { findBreedRange, BREED_DISCLAIMER } from "../data/breedRanges";
 
 
 const PET_TYPES = [
@@ -23,7 +25,7 @@ const PET_TYPES = [
   { key: "other", label: "อื่นๆ", icon: "paw", healthyRange: [3, 6] },
 ];
 
-function AddPetScreen({ go, addPet }) {
+function AddPetScreen({ go, addPet, goSubscription }) {
   const [name, setName] = useState("");
   const [breed, setBreed] = useState("");
   const [age, setAge] = useState("");
@@ -31,6 +33,8 @@ function AddPetScreen({ go, addPet }) {
   const [photo, setPhoto] = useState(null);
   const [type, setType] = useState(PET_TYPES[0]);
   const [otherType, setOtherType] = useState("");
+  const [inlineError, setInlineError] = useState(null); // ข้อความเตือนใต้ช่องน้ำหนัก
+  const breedMatch = findBreedRange(breed, type.key); // ช่วงน้ำหนักอ้างอิงตามสายพันธุ์ (แสดง hint ใต้ช่อง)
 
   const pickPhoto = async () => {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -54,8 +58,19 @@ function AddPetScreen({ go, addPet }) {
       Alert.alert("ยังไม่ได้กรอกชื่อ", "กรุณากรอกชื่อสัตว์เลี้ยง");
       return;
     }
+    // น้ำหนักกรอกมาแต่ไม่ใช่ตัวเลข — เตือนใต้ช่องแทนการเดาค่า
+    if (weight.trim() !== "") {
+      const parsed = parseFloat(weight);
+      if (isNaN(parsed) || parsed <= 0) {
+        setInlineError("น้ำหนักต้องเป็นตัวเลข เช่น 5.8");
+        return;
+      }
+    }
+    setInlineError(null);
     const initialWeight = parseFloat(weight);
     const weightToSeed = !isNaN(initialWeight) && initialWeight > 0 ? initialWeight : null;
+    // ช่วงสุขภาพ: จับคู่จากสายพันธุ์ก่อน ไม่เจอใช้ช่วงของประเภทสัตว์
+    const breedMatch = findBreedRange(breed, type.key);
     const ok = addPet(
       {
         id: Date.now().toString(),
@@ -64,12 +79,22 @@ function AddPetScreen({ go, addPet }) {
         age: age.trim() || "แรกเกิด",
         icon: type.icon,
         typeLabel: type.key === "other" && otherType.trim() ? otherType.trim() : type.label,
-        healthyRange: type.healthyRange,
+        healthyRange: breedMatch ? breedMatch.range : type.healthyRange,
         photo,
       },
       weightToSeed
     );
-    if (ok !== false) go("home"); // false = ถูกจำกัดจำนวนสัตว์ — ค้างไว้ให้แก้/อัปเกรด
+    if (ok !== false) {
+      go("home");
+      return;
+    }
+    // ครบจำนวนตามแพ็กเกจ — ชวนอัปเกรดและพาไปหน้าเลือกแพ็กเกจ
+    confirmDialog({
+      title: "จำนวนสัตว์เลี้ยงเต็มตามแพ็กเกจ",
+      message: "แพ็กเกจปัจจุบันของคุณรับได้จำนวนจำกัด\nซื้อแพ็กเกจอื่นเพื่อเพิ่มจำนวนสัตว์เลี้ยงได้เลย!",
+      confirmText: "ดูแพ็กเกจ",
+      onConfirm: () => goSubscription?.(),
+    });
   };
 
   return (
@@ -77,13 +102,12 @@ function AddPetScreen({ go, addPet }) {
       <Header title="เพิ่มสัตว์เลี้ยง" onBack={() => go("home")} />
       <AnimatedScrollView contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 40 }}>
         <Reveal>
-          <Pressable onPress={pickPhoto} style={styles.avatarWrap}>
+          <Pressable onPress={pickPhoto} style={({ pressed }) => [styles.avatarWrap, pressed && { opacity: 0.85 }]}>
             {photo ? (
               <Image source={{ uri: photo }} style={styles.avatarPhoto} resizeMode="cover" />
             ) : (
               <View style={styles.avatarPlaceholder}>
                 <Camera size={28} color={colors.brownLight} strokeWidth={2} />
-                <AppText style={styles.avatarPlaceholderText}>เพิ่มรูป</AppText>
               </View>
             )}
           </Pressable>
@@ -101,8 +125,14 @@ function AddPetScreen({ go, addPet }) {
                 {PET_TYPES.map((t) => {
                   const active = type.key === t.key;
                   return (
-                    <Pressable key={t.key} onPress={() => setType(t)}>
-                      <Badge variant={active ? "default" : "outline"} icon={<PetIcon name={t.icon} size={12} color={active ? "#FFFFFF" : colors.textBody} />}>
+                    <Pressable
+                      key={t.key}
+                      onPress={() => setType(t)}
+                      // badge เตี้ย — เติม hitSlop ให้พื้นที่แตะรวม >= 44pt
+                      hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                      style={({ pressed }) => [{ borderRadius: radius.full }, pressed && { opacity: 0.85 }]}
+                    >
+                      <Badge variant={active ? "default" : "outline"} icon={<PetIcon name={t.icon} size={12} color={active ? colors.white : colors.textBody} />}>
                         {t.label}
                       </Badge>
                     </Pressable>
@@ -120,14 +150,30 @@ function AddPetScreen({ go, addPet }) {
                 />
               )}
               <View style={{ marginTop: 6 }}>
-                <Field label="ชื่อสัตว์เลี้ยง" value={name} onChangeText={setName} placeholder="เช่น Coco" />
-                <Field label="สายพันธุ์" value={breed} onChangeText={setBreed} placeholder="เช่น โกลเด้นรีทรีฟเวอร์" />
-                <Field label="อายุ" value={age} onChangeText={setAge} placeholder="เช่น 1 ปี" />
-                <Field label="น้ำหนักเริ่มต้น (kg)" value={weight} onChangeText={setWeight} placeholder="เช่น 5.8" keyboardType="decimal-pad" />
+                <Field label="ชื่อสัตว์เลี้ยง (จำเป็น)" value={name} onChangeText={setName} placeholder="เช่น Coco" />
+                <Field label="สายพันธุ์ (ไม่บังคับ)" value={breed} onChangeText={setBreed} placeholder="เช่น โกลเด้นรีทรีฟเวอร์" />
+                {breedMatch && (
+                  <AppText style={styles.breedHint}>
+                    ช่วงน้ำหนักอ้างอิง: {breedMatch.range[0]}–{breedMatch.range[1]} kg — {BREED_DISCLAIMER}
+                  </AppText>
+                )}
+                <Field label="อายุ (ไม่บังคับ)" value={age} onChangeText={setAge} placeholder="เช่น 1 ปี" />
+                <Field
+                  label="น้ำหนักเริ่มต้น kg (ไม่บังคับ)"
+                  value={weight}
+                  onChangeText={(t) => {
+                    setWeight(t);
+                    setInlineError(null);
+                  }}
+                  placeholder="เช่น 5.8"
+                  keyboardType="decimal-pad"
+                  error={Boolean(inlineError)}
+                  errorText={inlineError}
+                />
               </View>
             </CardContent>
             <CardFooter>
-              <Button title="บันทึก" onPress={handleSave} style={{ flex: 1 }} />
+              <Button title="เพิ่มสัตว์เลี้ยง" onPress={handleSave} style={{ flex: 1 }} />
             </CardFooter>
           </Card>
         </Reveal>
@@ -140,9 +186,9 @@ const styles = StyleSheet.create({
   avatarWrap: { width: 100, height: 100, borderRadius: radius.full, backgroundColor: colors.cardTanBg, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center", marginTop: 10, overflow: "hidden", alignSelf: "center" },
   avatarPhoto: { width: 100, height: 100, borderRadius: radius.full },
   avatarPlaceholder: { alignItems: "center", justifyContent: "center" },
-  avatarPlaceholderText: { color: colors.textGray, fontSize: 12, fontWeight: "400", marginTop: 4 },
   uploadText: { color: colors.textGray, marginTop: 12, marginBottom: 16, fontSize: 14, fontWeight: "400", textAlign: "center" },
   typeRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 18 },
+  breedHint: { fontSize: 12, color: colors.textGray, marginTop: -10, marginBottom: 12 },
 });
 
 export default AddPetScreen;

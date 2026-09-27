@@ -9,7 +9,10 @@ function ProgressBar({ value, max, accent = colors.greenDark, label, showNumbers
   const over = max > 0 && value > max;
 
   return (
-    <View>
+    <View
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: max ?? 0, now: value ?? 0 }}
+    >
       {(label || showNumbers) && (
         <View style={styles.row}>
           {label ? <AppText style={styles.label}>{label}</AppText> : <View style={{ flex: 1 }} />}
@@ -39,7 +42,7 @@ const styles = StyleSheet.create({
   track: {
     height: 10,
     borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.55)",
+    backgroundColor: colors.trackBg,
     borderColor: "rgba(255,255,255,0.6)",
     borderWidth: 1,
     overflow: "hidden",

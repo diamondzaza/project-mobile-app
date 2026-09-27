@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
   input: { paddingLeft: 44 },
  
   inputSecure: { paddingRight: 44 },
-  inputError: { borderColor: "#B23A22" },
+  inputError: { borderColor: colors.danger },
   eyeButton: { position: "absolute", right: 14, top: 12 },
-  errorText: { color: "#B23A22", fontSize: 12, fontWeight: "600", marginTop: 6 },
+  errorText: { color: colors.danger, fontSize: 12, fontWeight: "600", marginTop: 6 },
 });

@@ -6,11 +6,11 @@ import AppText from "../AppText";
 
 
 const VARIANTS = {
-  default: { backgroundColor: "#A8552E", color: "#FFFFFF" },
+  default: { backgroundColor: colors.accentDeep, color: colors.white },
   secondary: { backgroundColor: "rgba(232,196,160,0.5)", color: colors.textDark },
   outline: { backgroundColor: "transparent", color: colors.textBody, borderWidth: 1, borderColor: "rgba(255,255,255,0.6)" },
   success: { backgroundColor: "#F3D9C2", color: "#8F4A26" },
-  warning: { backgroundColor: "#F6E0DC", color: "#A8473D" },
+  warning: { backgroundColor: "#F6E0DC", color: colors.danger },
 };
 
 export function Badge({ children, variant = "default", style, textStyle, icon }) {

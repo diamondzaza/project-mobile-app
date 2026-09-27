@@ -1,5 +1,6 @@
 /** ไอคอนสัตว์เลี้ยง */
 import { Dog, Cat, Rabbit, Bird, Turtle, Fish, PawPrint } from "lucide-react-native";
+import { colors } from "../theme";
 
 const PET_ICON_MAP = {
   dog: Dog,
@@ -10,7 +11,7 @@ const PET_ICON_MAP = {
   fish: Fish,
 };
 
-export default function PetIcon({ name, size = 24, color = "#A8552E", strokeWidth = 2, ...rest }) {
+export default function PetIcon({ name, size = 24, color = colors.accentDeep, strokeWidth = 2, ...rest }) {
   const Icon = PET_ICON_MAP[name] || PawPrint;
   return <Icon size={size} color={color} strokeWidth={strokeWidth} {...rest} />;
 }

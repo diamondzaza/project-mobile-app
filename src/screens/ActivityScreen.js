@@ -1,16 +1,25 @@
 /** หน้า Activity */
 import { useState, useRef, useEffect } from "react";
 import { SafeAreaView, View, TextInput, Pressable, Switch, StyleSheet, Animated } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Feather } from "@expo/vector-icons";
-import { Footprints, Volleyball, Moon, Flame, PawPrint } from "lucide-react-native";
+import {
+  Footprints,
+  Volleyball,
+  Moon,
+  PawPrint,
+  Target,
+  Pencil,
+  Plus,
+  Layers,
+  Bell,
+} from "lucide-react-native";
 
 import Card from "../components/Card";
 import AppText from "../components/AppText";
 import IconButton from "../components/IconButton";
+import Header from "../components/Header";
 import ProgressBar from "../components/ProgressBar";
 import SimpleBarChart from "../calendar/SimpleBarChart";
-import { colors, shadow } from "../theme";
+import { colors, category, shadow } from "../theme";
 import { isSameDate, timeAgo, formatGregorianShort, MONTH_ABBR } from "../utils/date";
 import { WEEKDAY_LABELS, MONTH_NAMES, WALK_REMINDER_HOUR_OPTIONS, DEFAULT_WALK_REMINDER_HOUR } from "../data/constants";
 import { parseMinutes, minutesLabel } from "../utils/parse";
@@ -19,10 +28,10 @@ import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 
 const CAT = {
-  accent: "#C97B5A",
-  
-  accentDeep: "#A8552E",
-  soft: "#F3D9C2", grad: ["#E8C4A0", "#F3D9C2"],
+  accent: colors.accent,
+
+  accentDeep: colors.accentDeep,
+  soft: colors.greenPastel, grad: [colors.greenPastel, "#F3D9C2"],
   tags: [
     { key: "Walk", label: "เดินเล่น", Icon: Footprints },
     { key: "Play", label: "เล่น", Icon: Volleyball },
@@ -44,7 +53,8 @@ const minsSplit = (mins) => {
 };
 
 
-const TAG_DOT = { Walk: "#4E7FA8", Play: "#8A6FB0", Rest: "#8F6B14" };
+// จุดสีหมวดกิจกรรม — ใช้ token จาก theme (activity = เดินเล่น/เล่น, appointments = พักผ่อน)
+const TAG_DOT = { Walk: category.activity.main, Play: category.health.main, Rest: category.appointments.main };
 
 
 const glassCard = {
@@ -78,6 +88,7 @@ const PERIODS = [
 const dateKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 
 function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSetGoal, walkReminder, onSetWalkReminder }) {
+  const scrollRef = useRef(null);
   const [text, setText] = useState("");
   const [activeTag, setActiveTag] = useState(CAT.tags[0].key);
   const [chartPeriod, setChartPeriod] = useState("week");
@@ -246,6 +257,7 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
             onChangeText={setEditText}
             autoFocus
             onSubmitEditing={saveEdit}
+            accessibilityLabel="แก้ไขข้อความกิจกรรม"
           />
           <IconButton icon="check" color={CAT.accentDeep} accessibilityLabel="บันทึกการแก้ไข" onPress={saveEdit} />
           <IconButton icon="x" color={colors.textBody} accessibilityLabel="ยกเลิกการแก้ไข" onPress={() => setEditingId(null)} />
@@ -278,7 +290,7 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
           {onEdit && (
             <IconButton icon="edit-2" size={16} color={colors.brown} accessibilityLabel="แก้ไขรายการ" onPress={() => startEdit(it)} />
           )}
-          <IconButton icon="trash-2" size={16} color="#B23A22" accessibilityLabel="ลบรายการ" onPress={() => handleDelete(it)} />
+          <IconButton icon="trash-2" size={16} color={colors.danger} accessibilityLabel="ลบรายการ" onPress={() => handleDelete(it)} />
         </Card>
       </Reveal>
     );
@@ -289,24 +301,16 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        <AnimatedScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-          <LinearGradient colors={CAT.grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-            <Pressable onPress={() => go("petProfile")} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="กลับไปหน้าโปรไฟล์สัตว์เลี้ยง">
-              <Feather name="chevron-left" size={22} color={colors.textDark} />
-            </Pressable>
-            <AppText style={styles.headerTitle}>กิจกรรม · {activePet.name}</AppText>
-            <View style={[styles.countPill, { backgroundColor: streak > 0 ? CAT.accentDeep : colors.textBody }]}>
-              <Flame size={12} color="#FFFFFF" />
-              <AppText style={styles.countText}>ต่อเนื่อง {streak} วัน</AppText>
-            </View>
-          </LinearGradient>
+        {/* Header เดียวกับหน้านัดหมาย: กลับ / ชื่อ */}
+        <Header title={`กิจกรรมของ ${activePet.name}`} onBack={() => go("petProfile")} />
+        <AnimatedScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 32 }}>
 
 
           <Reveal>
             <Card style={[glassCardStrong, styles.goalCard]}>
               <View style={styles.goalRow}>
                 <View style={[styles.summaryIcon, { backgroundColor: CAT.soft }]}>
-                  <Feather name="target" size={18} color={CAT.accentDeep} />
+                  <Target size={18} color={CAT.accentDeep} strokeWidth={2} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <AppText style={styles.summaryLabel}>
@@ -331,17 +335,70 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                 ) : (
                   <Pressable
                     onPress={() => { setGoalText(String(goal)); setGoalEditing(true); }}
-                    style={styles.goalPill}
+                    style={({ pressed }) => [styles.goalPill, pressed && { opacity: 0.85 }]}
                     accessibilityRole="button"
                     accessibilityLabel={`แก้ไขเป้าหมายรายวัน ปัจจุบัน ${goal} นาที`}
                   >
-                    <Feather name="edit-2" size={11} color="#FFFFFF" />
+                    <Pencil size={11} color={colors.white} strokeWidth={2} />
                     <AppText style={styles.goalPillText}>เป้า {goal} นาที</AppText>
-                    <AppText style={styles.goalEditLabel}>แก้ไข</AppText>
                   </Pressable>
                 )}
               </View>
               <ProgressBar value={walkMinsToday} max={goal} unit=" นาที" accent={CAT.accentDeep} />
+            </Card>
+          </Reveal>
+
+          {/* ช่องพิมพ์กิจกรรม — ย้ายขึ้นมาไว้ใต้การ์ดเป้าหมาย ก่อนกราฟ */}
+          <Reveal>
+            <Card style={[glassCard, styles.inputCard]}>
+              <View style={styles.inputRow}>
+                <View style={styles.inputWrap}>
+                  <TextInput
+                    style={styles.input}
+                    value={text}
+                    onChangeText={setText}
+                    placeholder="เช่น เดินเล่นในสวน 30 นาที"
+                    placeholderTextColor={colors.textGray}
+                    onSubmitEditing={handleAdd}
+                    accessibilityLabel="รายละเอียดกิจกรรมใหม่"
+                  />
+                </View>
+
+                <Animated.View style={{ transform: [{ scale: addScale }] }}>
+                  <Pressable
+                    onPress={handleAdd}
+                    style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
+                    accessibilityRole="button"
+                    accessibilityLabel="บันทึกรายการกิจกรรมนี้"
+                  >
+                    <Plus size={16} color={colors.white} strokeWidth={2} />
+                    <AppText style={styles.addBtnText}>บันทึก</AppText>
+                  </Pressable>
+                </Animated.View>
+              </View>
+              <AppText style={styles.sectionLabel}>หมวดหมู่</AppText>
+              <View style={styles.chipsRowInner}>
+                {CAT.tags.map((t) => {
+                  const active = activeTag === t.key;
+                  return (
+                    <Pressable
+                      key={t.key}
+                      onPress={() => setActiveTag(t.key)}
+                      style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityLabel={`หมวดหมู่กิจกรรม: ${t.label}`}
+                    >
+                      <View style={styles.chipInner}>
+                        <t.Icon size={13} color={active ? colors.white : colors.textDark} />
+                        <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                          {t.label}
+                        </AppText>
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </Card>
           </Reveal>
 
@@ -355,12 +412,12 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                     <Pressable
                       key={p.key}
                       onPress={() => setChartPeriod(p.key)}
-                      style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                      style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       accessibilityLabel={`ช่วงกราฟ: ${p.label}`}
                     >
-                      <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                      <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                         {p.label}
                       </AppText>
                     </Pressable>
@@ -371,14 +428,14 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
               <View style={styles.chipsRowInner}>
                 <Pressable
                   onPress={() => setChartTag("all")}
-                  style={[styles.chip, chartTag === "all" ? styles.chipActive : styles.chipGlass]}
+                  style={({ pressed }) => [styles.chip, chartTag === "all" ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: chartTag === "all" }}
                   accessibilityLabel="กราฟทุกกิจกรรมรวมกัน"
                 >
                   <View style={styles.chipInner}>
-                    <Feather name="layers" size={13} color={chartTag === "all" ? "#FFFFFF" : colors.textDark} />
-                    <AppText style={[styles.chipText, { color: chartTag === "all" ? "#FFFFFF" : colors.textDark, fontWeight: chartTag === "all" ? "600" : "400" }]}>
+                    <Layers size={13} color={chartTag === "all" ? colors.white : colors.textDark} strokeWidth={2} />
+                    <AppText style={[styles.chipText, { color: chartTag === "all" ? colors.white : colors.textDark, fontWeight: chartTag === "all" ? "600" : "400" }]}>
                       ทั้งหมด
                     </AppText>
                   </View>
@@ -389,14 +446,14 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                     <Pressable
                       key={t.key}
                       onPress={() => setChartTag(t.key)}
-                      style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                      style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       accessibilityLabel={`กราฟกิจกรรม: ${t.label}`}
                     >
                       <View style={styles.chipInner}>
-                        <t.Icon size={13} color={active ? "#FFFFFF" : colors.textDark} />
-                        <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                        <t.Icon size={13} color={active ? colors.white : colors.textDark} />
+                        <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                           {t.label}
                         </AppText>
                       </View>
@@ -434,7 +491,7 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
             <Card style={[glassCard, styles.reminderCard]}>
               <View style={styles.goalRow}>
                 <View style={[styles.summaryIcon, { backgroundColor: CAT.soft }]}>
-                  <Feather name="bell" size={18} color={CAT.accentDeep} />
+                  <Bell size={18} color={CAT.accentDeep} strokeWidth={2} />
                 </View>
                 <View style={{ flex: 1, marginLeft: 12 }}>
                   <AppText style={styles.summaryLabel}>แจ้งเตือนเดินเล่นประจำวัน</AppText>
@@ -448,7 +505,7 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                   value={reminderOn}
                   onValueChange={(v) => onSetWalkReminder(activePet.id, { on: v })}
                   trackColor={{ true: CAT.accentDeep, false: "rgba(90,52,25,0.2)" }}
-                  thumbColor="#FFFFFF"
+                  thumbColor={colors.white}
                   accessibilityLabel="เปิด/ปิดแจ้งเตือนเดินเล่นรายวัน"
                 />
               </View>
@@ -460,12 +517,12 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                       <Pressable
                         key={h}
                         onPress={() => onSetWalkReminder(activePet.id, { hour: h })}
-                        style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                        style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`ตั้งเวลาแจ้งเตือนเดินเล่น ${h}:00`}
                       >
-                        <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                        <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                           {String(h).padStart(2, "0")}:00
                         </AppText>
                       </Pressable>
@@ -473,59 +530,6 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                   })}
                 </View>
               )}
-            </Card>
-          </Reveal>
-
-          <Reveal>
-            <Card style={[glassCard, styles.inputCard]}>
-              <View style={styles.inputRow}>
-                <View style={styles.inputWrap}>
-                  <TextInput
-                    style={styles.input}
-                    value={text}
-                    onChangeText={setText}
-                    placeholder="เช่น เดินเล่นในสวน 30 นาที"
-                    placeholderTextColor={colors.textGray}
-                    onSubmitEditing={handleAdd}
-                    accessibilityLabel="รายละเอียดกิจกรรมใหม่"
-                  />
-                </View>
-        
-                <Animated.View style={{ transform: [{ scale: addScale }] }}>
-                  <Pressable
-                    onPress={handleAdd}
-                    style={styles.addBtn}
-                    accessibilityRole="button"
-                    accessibilityLabel="บันทึกรายการกิจกรรมนี้"
-                  >
-                    <Feather name="plus" size={16} color="#FFFFFF" />
-                    <AppText style={styles.addBtnText}>บันทึก</AppText>
-                  </Pressable>
-                </Animated.View>
-              </View>
-              <AppText style={styles.sectionLabel}>หมวดหมู่</AppText>
-              <View style={styles.chipsRowInner}>
-                {CAT.tags.map((t) => {
-                  const active = activeTag === t.key;
-                  return (
-                    <Pressable
-                      key={t.key}
-                      onPress={() => setActiveTag(t.key)}
-                      style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                      accessibilityLabel={`หมวดหมู่กิจกรรม: ${t.label}`}
-                    >
-                      <View style={styles.chipInner}>
-                        <t.Icon size={13} color={active ? "#FFFFFF" : colors.textDark} />
-                        <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
-                          {t.label}
-                        </AppText>
-                      </View>
-                    </Pressable>
-                  );
-                })}
-              </View>
             </Card>
           </Reveal>
 
@@ -538,12 +542,12 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                   <Pressable
                     key={p.key}
                     onPress={() => setPeriod(p.key)}
-                    style={[styles.chip, active ? styles.chipActive : styles.chipGlass]}
+                    style={({ pressed }) => [styles.chip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                     accessibilityLabel={`ช่วงบันทึก: ${p.label}`}
                   >
-                    <AppText style={[styles.chipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                    <AppText style={[styles.chipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                       {p.label}
                     </AppText>
                   </Pressable>
@@ -582,15 +586,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+    ...shadow,
   },
-  backBtn: { padding: 6 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.textDark, marginLeft: 4 },
-  countPill: { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, ...shadow },
-  countText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 
   goalCard: { marginHorizontal: 20, marginTop: 16, padding: 14 },
   chartCard: { marginHorizontal: 20, marginTop: 14, padding: 14 },
@@ -612,13 +618,12 @@ const styles = StyleSheet.create({
     flexDirection: "row", alignItems: "center", gap: 5,
     backgroundColor: CAT.accentDeep, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6,
   },
-  goalPillText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
-  goalEditLabel: { color: "#FFFFFF", fontSize: 12, fontWeight: "400" },
+  goalPillText: { color: colors.white, fontSize: 12, fontWeight: "700" },
   goalEditRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   goalInput: {
     width: 70, height: 34, backgroundColor: colors.cardBg, borderRadius: 10,
     borderWidth: 1, borderColor: colors.border, paddingHorizontal: 8,
-    fontSize: 14, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular", textAlign: "center",
+    fontSize: 14, color: colors.textDark, fontFamily: "Kanit_400Regular", textAlign: "center",
   },
   goalUnit: { fontSize: 13, fontWeight: "700", color: colors.textBody },
   summaryIcon: { width: 38, height: 38, borderRadius: 19, alignItems: "center", justifyContent: "center" },
@@ -646,16 +651,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     justifyContent: "center",
   },
-  input: { fontSize: 15, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular" },
+  input: { fontSize: 15, color: colors.textDark, fontFamily: "Kanit_400Regular" },
   addBtn: {
     height: 50, paddingHorizontal: 14, borderRadius: 14,
     backgroundColor: CAT.accentDeep, alignItems: "center", justifyContent: "center",
     flexDirection: "row", gap: 4, ...shadow,
   },
-  addBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  addBtnText: { color: colors.white, fontSize: 14, fontWeight: "700" },
 
   chipsRowInner: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 999 },
+  chip: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 999 },
   chipInner: { flexDirection: "row", alignItems: "center", gap: 5 },
   chipGlass: {
     backgroundColor: "rgba(255,255,255,0.6)",
@@ -673,7 +678,7 @@ const styles = StyleSheet.create({
   listWrap: { marginTop: 12, paddingHorizontal: 20 },
   dayHeader: { fontSize: 13, fontWeight: "700", color: colors.textBody, marginBottom: 10, marginTop: 4 },
   row: { flexDirection: "row", alignItems: "center", marginBottom: 12, paddingVertical: 10 },
-  editInput: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular", paddingVertical: 4, marginRight: 4 },
+  editInput: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "Kanit_400Regular", paddingVertical: 4, marginRight: 4 },
   dot: { width: 10, height: 10, borderRadius: 5 },
   rowTitle: { fontSize: 15, fontWeight: "600", color: colors.textDark },
   rowSub: { fontSize: 12, fontWeight: "400", color: colors.textBody, marginTop: 2 },

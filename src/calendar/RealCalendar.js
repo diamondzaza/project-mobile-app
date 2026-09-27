@@ -1,7 +1,7 @@
 /** ปฏิทินรายเดือน**/
 import { useState } from "react";
 import { View, Pressable, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react-native";
 import AppText from "../components/AppText";
 
 import { colors, radius } from "../theme";
@@ -65,16 +65,16 @@ function RealCalendar({ markedDates = [], onSelectDate, selectedDate, compact = 
   const monthTable = (
     <View>
       <View style={styles.calHeaderRow}>
-        <Pressable onPress={goPrevMonth} style={styles.calNavBtn}>
-          <Feather name="chevron-left" size={20} color={colors.brown} />
+        <Pressable onPress={goPrevMonth} style={({ pressed }) => [styles.calNavBtn, pressed && { opacity: 0.7 }]} hitSlop={12}>
+          <ChevronLeft size={20} color={colors.brown} strokeWidth={2} />
         </Pressable>
-        <Pressable onPress={goToday}>
+        <Pressable onPress={goToday} hitSlop={12} style={({ pressed }) => [pressed && { opacity: 0.7 }]}>
           <AppText style={styles.monthLabel}>
             {MONTH_NAMES[viewMonth]} {viewYear}
           </AppText>
         </Pressable>
-        <Pressable onPress={goNextMonth} style={styles.calNavBtn}>
-          <Feather name="chevron-right" size={20} color={colors.brown} />
+        <Pressable onPress={goNextMonth} style={({ pressed }) => [styles.calNavBtn, pressed && { opacity: 0.7 }]} hitSlop={12}>
+          <ChevronRight size={20} color={colors.brown} strokeWidth={2} />
         </Pressable>
       </View>
 
@@ -97,17 +97,19 @@ function RealCalendar({ markedDates = [], onSelectDate, selectedDate, compact = 
               <Pressable
                 key={colIdx}
                 onPress={() => onSelectDate && onSelectDate(new Date(viewYear, viewMonth, d))}
-                style={[
+                hitSlop={8}
+                style={({ pressed }) => [
                   styles.dateCell,
                   marked && styles.dateActive,
                   today_ && !marked && !selected && styles.dateToday,
                   selected && styles.dateSelected,
+                  pressed && { opacity: 0.7 },
                 ]}
               >
                 <AppText
                   style={[
                     styles.dateText,
-                    (marked || selected) && { color: "#fff", fontWeight: "700" },
+                    (marked || selected) && { color: colors.white, fontWeight: "700" },
                     today_ && !marked && !selected && { color: colors.brown, fontWeight: "700" },
                   ]}
                 >
@@ -132,10 +134,15 @@ function RealCalendar({ markedDates = [], onSelectDate, selectedDate, compact = 
       {compact && (
         <View style={styles.pillRow}>
           <View style={styles.datePill}>
-            <Feather name="calendar" size={15} color={colors.brown} />
+            <CalendarIcon size={15} color={colors.brown} strokeWidth={2} />
             <AppText style={styles.pillDateText}>{pillDate}</AppText>
           </View>
-          <Pressable onPress={() => setExpanded((e) => !e)} style={styles.changeBtn}>
+          <Pressable
+            onPress={() => setExpanded((e) => !e)}
+            style={({ pressed }) => [styles.changeBtn, pressed && { opacity: 0.85 }]}
+            hitSlop={6}
+            accessibilityRole="button"
+          >
             <AppText style={styles.changeBtnText}>{expanded ? "เสร็จแล้ว" : "เปลี่ยน"}</AppText>
           </Pressable>
         </View>
@@ -149,15 +156,16 @@ const styles = StyleSheet.create({
   pillRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 12 },
   datePill: { flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: colors.greenPastel, paddingVertical: 8, paddingHorizontal: 14, borderRadius: radius.full },
   pillDateText: { fontSize: 14, fontWeight: "700", color: colors.textDark },
-  changeBtn: { backgroundColor: "#A8552E", paddingVertical: 8, paddingHorizontal: 16, borderRadius: radius.full },
-  changeBtnText: { color: "#fff", fontSize: 13, fontWeight: "600" },
+  changeBtn: { backgroundColor: colors.accentDeep, paddingVertical: 8, paddingHorizontal: 16, borderRadius: radius.full },
+  changeBtnText: { color: colors.white, fontSize: 13, fontWeight: "600" },
   calHeaderRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
   calNavBtn: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.cardTanBg },
   monthLabel: { fontWeight: "700", fontSize: 16, color: colors.textDark },
   calendarRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 6 },
-  dayLabel: { width: 32, textAlign: "center", fontSize: 13, fontWeight: "500", color: colors.textGray },
-  dateCell: { width: 32, height: 32, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
-  dateActive: { backgroundColor: "#A8552E" },
+  dayLabel: { width: 36, textAlign: "center", fontSize: 13, fontWeight: "500", color: colors.textGray },
+  // ช่องวัน 36x36 + hitSlop 8 = พื้นที่แตะรวม ~52pt
+  dateCell: { width: 36, height: 36, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
+  dateActive: { backgroundColor: colors.accentDeep },
   dateToday: { borderWidth: 1.5, borderColor: colors.brown },
   dateSelected: { backgroundColor: colors.brown },
   dateText: { fontSize: 14, fontWeight: "400", color: colors.textDark },

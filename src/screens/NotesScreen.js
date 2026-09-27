@@ -1,12 +1,22 @@
 /** หน้า Notes*/
-import { useState } from "react";
-import { SafeAreaView, View, TextInput, Pressable, Image, StyleSheet } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { Feather } from "@expo/vector-icons";
+import { useRef, useState } from "react";
+import { SafeAreaView, View, TextInput, Pressable, Image, StyleSheet, Modal } from "react-native";
+import {
+  Plus,
+  Bell,
+  X,
+  Bookmark,
+  FileText,
+  Coffee,
+  Heart,
+  FaceGrinning,
+  Calendar,
+} from "lucide-react-native";
 
 import Card from "../components/Card";
 import AppText from "../components/AppText";
 import IconButton from "../components/IconButton";
+import Header from "../components/Header";
 import { colors, shadow } from "../theme";
 import { timeAgo, formatGregorianShort } from "../utils/date";
 import { NOTE_CATEGORIES, NOTE_REMINDER_OPTIONS } from "../data/constants";
@@ -15,10 +25,14 @@ import { confirmDelete } from "../utils/confirm";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 
+// ไอคอนหมวดหมู่มาจาก NOTE_CATEGORIES เป็น string — map เป็น component lucide ที่นี่
+// ("smile" ของ Feather ไม่มีใน lucide เวอร์ชันนี้ — ใช้ FaceGrinning แทน)
+const CATEGORY_ICONS = { coffee: Coffee, heart: Heart, smile: FaceGrinning, calendar: Calendar };
+
 const CAT = {
-  accent: "#C97B5A",
-  accentDeep: "#A8552E",
-  soft: "#F5E0CF", grad: ["#F3D9C2", "#F5E0CF"],
+  accent: colors.accent,
+  accentDeep: colors.accentDeep,
+  soft: "#F5E0CF", grad: [colors.greenPastel, "#F5E0CF"],
   emptyTitle: "ยังไม่มีโน้ต",
   footer: "ปักหมุดโน้ตสำคัญ (เช่น เรื่องแพ้อาหาร) ให้อยู่บนสุดเสมอ",
 };
@@ -41,6 +55,7 @@ function reminderDateFromOption(opt) {
 }
 
 function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
+  const scrollRef = useRef(null);
   const [text, setText] = useState("");
   const [activeCategory, setActiveCategory] = useState(NOTE_CATEGORIES[0].key);
   const [filter, setFilter] = useState("All");
@@ -49,6 +64,7 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
   const [pendingReminder, setPendingReminder] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [viewerPhoto, setViewerPhoto] = useState(null); // uri รูปที่กำลังดูเต็มจอ (null = ปิด)
 
   const list = items || [];
   const filterLabel = FILTERS.find((f) => f.key === filter)?.label || filter;
@@ -124,11 +140,25 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
     ) : (
       <Reveal key={it.id}>
         <Card style={[styles.row, it.pinned && styles.rowPinned]}>
+          {/* โน้ตที่ปักหมุด — ไอคอน bookmark มุมขวาบนของการ์ด */}
+          {it.pinned && (
+            <View style={styles.pinnedBadge}>
+              <Bookmark size={13} color={colors.accentDeep} strokeWidth={2} />
+            </View>
+          )}
           {it.photo ? (
-            <Image source={{ uri: it.photo }} style={styles.thumb} />
+            <Pressable
+              onPress={() => setViewerPhoto(it.photo)}
+              hitSlop={6}
+              style={({ pressed }) => [styles.thumbWrap, pressed && { opacity: 0.85 }]}
+              accessibilityRole="imagebutton"
+              accessibilityLabel="ดูรูปโน้ตเต็มจอ"
+            >
+              <Image source={{ uri: it.photo }} style={styles.thumb} />
+            </Pressable>
           ) : (
             <View style={styles.catIconWrap}>
-              <Feather name={catOf(it.category)?.icon || "file-text"} size={18} color={CAT.accentDeep} />
+              {(() => { const CatIcon = CATEGORY_ICONS[catOf(it.category)?.icon] || FileText; return <CatIcon size={18} color={CAT.accentDeep} strokeWidth={2} />; })()}
             </View>
           )}
           <View style={{ flex: 1, marginLeft: 10 }}>
@@ -150,7 +180,7 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
           {onEdit && (
             <IconButton icon="edit-2" color={colors.brown} accessibilityLabel="แก้ไขโน้ต" onPress={() => startEdit(it)} />
           )}
-          <IconButton icon="trash-2" color="#B23A22" style={styles.deleteBtn} accessibilityLabel="ลบโน้ต" onPress={() => handleDelete(it)} />
+          <IconButton icon="trash-2" color={colors.danger} style={styles.deleteBtn} accessibilityLabel="ลบโน้ต" onPress={() => handleDelete(it)} />
         </Card>
       </Reveal>
     );
@@ -158,16 +188,9 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
   return (
     <SafeAreaView style={{ flex: 1 }}>
       <View style={{ flex: 1 }}>
-        <AnimatedScrollView contentContainerStyle={{ paddingBottom: 32 }}>
-          <LinearGradient colors={CAT.grad} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.header}>
-            <Pressable onPress={() => go("petProfile")} style={styles.backBtn} accessibilityRole="button" accessibilityLabel="กลับไปหน้าโปรไฟล์สัตว์เลี้ยง">
-              <Feather name="chevron-left" size={22} color={colors.textDark} />
-            </Pressable>
-            <AppText style={styles.headerTitle}>โน้ต · {activePet.name}</AppText>
-            <View style={styles.countPill}>
-              <AppText style={styles.countText}>{list.length} โน้ต</AppText>
-            </View>
-          </LinearGradient>
+        {/* Header เดียวกับหน้านัดหมาย: กลับ / ชื่อ */}
+        <Header title={`โน้ตของ ${activePet.name}`} onBack={() => go("petProfile")} />
+        <AnimatedScrollView ref={scrollRef} contentContainerStyle={{ paddingBottom: 32 }}>
 
           <Reveal>
             <Card style={styles.composerCard}>
@@ -185,11 +208,11 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
                 </View>
                 <Pressable
                   onPress={handleAdd}
-                  style={styles.addBtn}
+                  style={({ pressed }) => [styles.addBtn, pressed && { opacity: 0.85 }]}
                   accessibilityRole="button"
                   accessibilityLabel="เพิ่มโน้ตนี้"
                 >
-                  <Feather name="plus" size={14} color="#FFFFFF" />
+                  <Plus size={14} color={colors.white} strokeWidth={2} />
                   <AppText style={styles.addBtnText}>เพิ่ม</AppText>
                 </Pressable>
               </View>
@@ -199,13 +222,20 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
                 <IconButton icon="image" size={16} color={CAT.accentDeep} accessibilityLabel="เลือกรูปจากคลังภาพ" onPress={() => handlePhoto("gallery")} />
                 <Pressable
                   onPress={() => setReminderOpen((v) => !v)}
-                  style={[styles.reminderChip, (pendingReminder || reminderOpen) && styles.reminderChipActive]}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.reminderChip,
+                    // เปิดแผง = กรอบเส้นเท่านั้น / มีแจ้งเตือนที่ตั้งไว้ = พื้นเข้ม
+                    reminderOpen && styles.reminderChipOpen,
+                    pendingReminder && styles.reminderChipActive,
+                    pressed && { opacity: 0.85 },
+                  ]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: !!pendingReminder }}
                   accessibilityLabel="ตั้งเวลาแจ้งเตือนสำหรับโน้ตนี้"
                 >
-                  <Feather name="bell" size={13} color={pendingReminder || reminderOpen ? "#FFFFFF" : CAT.accentDeep} />
-                  <AppText style={[styles.reminderChipText, (pendingReminder || reminderOpen) && { color: "#FFFFFF" }]}>
+                  <Bell size={13} color={pendingReminder ? colors.white : CAT.accentDeep} strokeWidth={2} />
+                  <AppText style={[styles.reminderChipText, pendingReminder && { color: colors.white }]}>
                     {pendingReminder ? `แจ้งเตือน · ${NOTE_REMINDER_OPTIONS.find((o) => o.key === pendingReminder.optKey)?.label}` : "แจ้งเตือน"}
                   </AppText>
                 </Pressable>
@@ -216,14 +246,14 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
                   {pendingPhoto && (
                     <View style={styles.previewWrap}>
                       <Image source={{ uri: pendingPhoto }} style={styles.pendingThumb} />
-                      <Pressable onPress={() => setPendingPhoto(null)} style={styles.previewRemove} accessibilityRole="button" accessibilityLabel="เอารูปที่แนบออก">
-                        <Feather name="x" size={13} color="#FFFFFF" />
+                      <Pressable onPress={() => setPendingPhoto(null)} hitSlop={8} style={({ pressed }) => [styles.previewRemove, pressed && { opacity: 0.85 }]} accessibilityRole="button" accessibilityLabel="เอารูปที่แนบออก">
+                        <X size={13} color={colors.white} strokeWidth={2} />
                       </Pressable>
                     </View>
                   )}
                   {pendingReminder && (
                     <View style={styles.previewHintRow}>
-                      <Feather name="bell" size={13} color={colors.textBody} />
+                      <Bell size={13} color={colors.textBody} strokeWidth={2} />
                       <AppText style={styles.previewHint}>{reminderLabel(pendingReminder.date)}</AppText>
                     </View>
                   )}
@@ -242,12 +272,13 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
                             prev?.optKey === opt.key ? null : { optKey: opt.key, date: reminderDateFromOption(opt) }
                           )
                         }
-                        style={[styles.quickChip, active ? styles.chipActive : styles.chipGlass]}
+                        hitSlop={8}
+                        style={({ pressed }) => [styles.quickChip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: active }}
                         accessibilityLabel={`ตั้งแจ้งเตือน${opt.label}`}
                       >
-                        <AppText style={[styles.quickChipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                        <AppText style={[styles.quickChipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                           {opt.label}
                         </AppText>
                       </Pressable>
@@ -264,12 +295,13 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
                     <Pressable
                       key={c.key}
                       onPress={() => setActiveCategory(c.key)}
-                      style={[styles.quickChip, active ? styles.chipActive : styles.chipGlass]}
+                      hitSlop={8}
+                      style={({ pressed }) => [styles.quickChip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       accessibilityLabel={`หมวดหมู่โน้ตใหม่: ${c.label}`}
                     >
-                      <AppText style={[styles.quickChipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                      <AppText style={[styles.quickChipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                         {c.label}
                       </AppText>
                     </Pressable>
@@ -280,7 +312,7 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
           </Reveal>
 
           <View style={styles.listHeader}>
-            <AppText style={styles.sectionLabel}>กรอง</AppText>
+            <AppText style={styles.sectionLabel}>กรองตามหมวด</AppText>
             <View style={styles.quickRow}>
               {FILTERS.map((f) => {
                 const active = filter === f.key;
@@ -288,12 +320,13 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
                   <Pressable
                     key={f.key}
                     onPress={() => setFilter(f.key)}
-                    style={[styles.quickChip, active ? styles.chipActive : styles.chipGlass]}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.quickChip, active ? styles.chipActive : styles.chipGlass, pressed && { opacity: 0.85 }]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
                     accessibilityLabel={`กรองโน้ต: ${f.label}`}
                   >
-                    <AppText style={[styles.quickChipText, { color: active ? "#FFFFFF" : colors.textDark, fontWeight: active ? "600" : "400" }]}>
+                    <AppText style={[styles.quickChipText, { color: active ? colors.white : colors.textDark, fontWeight: active ? "600" : "400" }]}>
                       {f.label}
                     </AppText>
                   </Pressable>
@@ -306,7 +339,7 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
             <Reveal>
               <Card style={styles.emptyCard}>
                 <View style={styles.emptyCircle}>
-                  <Feather name="file-text" size={44} color={CAT.accentDeep} strokeWidth={1.8} />
+                  <FileText size={44} color={CAT.accentDeep} strokeWidth={1.8} />
                 </View>
                 <AppText style={styles.emptyTitle}>
                   {filter === "All" ? CAT.emptyTitle : `ยังไม่มีโน้ตหมวด${filterLabel}`}
@@ -326,6 +359,35 @@ function NotesScreen({ go, activePet, items, onAdd, onEdit, onRemove }) {
           <AppText style={styles.footer}>{CAT.footer}</AppText>
         </AnimatedScrollView>
       </View>
+
+      {/* ---------- Viewer รูปเต็มจอ (แยกจากโครงหลักของหน้า) ---------- */}
+      {viewerPhoto ? (
+        <Modal visible animationType="fade" transparent onRequestClose={() => setViewerPhoto(null)}>
+          {/* แตะพื้นหลังเพื่อปิด */}
+          <Pressable
+            style={styles.viewerBackdrop}
+            onPress={() => setViewerPhoto(null)}
+            accessibilityRole="button"
+            accessibilityLabel="ปิดหน้าดูรูป"
+          >
+            {/* กดที่ตัวรูป — ไม่ปิดหน้า */}
+            <Pressable style={styles.viewerImageWrap} onPress={() => {}}>
+              {viewerPhoto ? (
+                <Image source={{ uri: viewerPhoto }} style={styles.viewerImage} resizeMode="contain" />
+              ) : null}
+            </Pressable>
+          </Pressable>
+          <View style={styles.viewerCloseWrap} pointerEvents="box-none">
+            <IconButton
+              icon="x"
+              color={colors.white}
+              style={styles.viewerCloseBtn}
+              accessibilityLabel="ปิดหน้าดูรูป"
+              onPress={() => setViewerPhoto(null)}
+            />
+          </View>
+        </Modal>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -334,15 +396,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255,255,255,0.75)",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.6)",
+    ...shadow,
   },
-  backBtn: { padding: 6 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "700", color: colors.textDark, marginLeft: 4 },
-  countPill: { backgroundColor: CAT.accentDeep, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 5, ...shadow },
-  countText: { color: "#FFFFFF", fontSize: 12, fontWeight: "700" },
 
   composerCard: { marginHorizontal: 20, marginTop: 16, padding: 14 },
   inputRow: { flexDirection: "row", alignItems: "center", gap: 10 },
@@ -356,20 +420,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     justifyContent: "center",
   },
-  input: { fontSize: 15, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular" },
+  input: { fontSize: 15, color: colors.textDark, fontFamily: "Kanit_400Regular" },
   addBtn: {
     height: 48, paddingHorizontal: 14, borderRadius: 14,
     backgroundColor: CAT.accentDeep, alignItems: "center", justifyContent: "center",
     flexDirection: "row", gap: 4, ...shadow,
   },
-  addBtnText: { color: "#FFFFFF", fontSize: 14, fontWeight: "700" },
+  addBtnText: { color: colors.white, fontSize: 14, fontWeight: "700" },
 
   toolRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
   reminderChip: {
     flexDirection: "row", alignItems: "center", gap: 5,
     backgroundColor: "rgba(255,255,255,0.6)", borderWidth: 1, borderColor: "rgba(255,255,255,0.6)",
-    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8,
+    borderRadius: 999, paddingHorizontal: 12, paddingVertical: 11,
   },
+  // เปิดแผงแจ้งเตือน — ขอบเส้นสีส้มเข้มเท่านั้น (ยังไม่พื้นเข้ม)
+  reminderChipOpen: { borderColor: colors.accentDeep },
   reminderChipActive: { backgroundColor: CAT.accentDeep, borderColor: CAT.accentDeep },
   reminderChipText: { fontSize: 12, fontWeight: "600", color: colors.textDark },
 
@@ -377,7 +443,7 @@ const styles = StyleSheet.create({
   previewWrap: { width: 54, height: 54 },
   previewRemove: {
     position: "absolute", top: -6, right: -6, width: 20, height: 20, borderRadius: 10,
-    backgroundColor: "#B23A22", alignItems: "center", justifyContent: "center",
+    backgroundColor: colors.danger, alignItems: "center", justifyContent: "center",
   },
   previewHintRow: { flex: 1, flexDirection: "row", alignItems: "center", gap: 5 },
   previewHint: { flex: 1, fontSize: 12, fontWeight: "400", color: colors.textBody },
@@ -392,7 +458,7 @@ const styles = StyleSheet.create({
     marginBottom: 8, letterSpacing: 0.3,
   },
   quickRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-  quickChip: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 999 },
+  quickChip: { paddingHorizontal: 12, paddingVertical: 11, borderRadius: 999 },
   quickChipText: { fontSize: 13, fontWeight: "600" },
   chipGlass: {
     backgroundColor: "rgba(255,255,255,0.6)",
@@ -414,15 +480,27 @@ const styles = StyleSheet.create({
   listWrap: { marginTop: 14, paddingHorizontal: 20 },
   row: { flexDirection: "row", alignItems: "center", marginBottom: 12, paddingVertical: 10 },
   rowPinned: { borderColor: "rgba(168,85,46,0.8)", borderWidth: 1.5 },
-  editInput: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular", paddingVertical: 4, marginRight: 4 },
+  editInput: { flex: 1, fontSize: 15, color: colors.textDark, fontFamily: "Kanit_400Regular", paddingVertical: 4, marginRight: 4 },
   catIconWrap: { width: 40, height: 40, borderRadius: 12, backgroundColor: CAT.soft, alignItems: "center", justifyContent: "center" },
   thumb: { width: 40, height: 40, borderRadius: 12 },
+  // ครอบ thumbnail ไว้เพื่อทำ pressed feedback ให้ทั้งปุ่ม (ไม่ใช่แค่รูป)
+  thumbWrap: { width: 40, height: 40, borderRadius: 12 },
   rowTitle: { fontSize: 15, fontWeight: "600", color: colors.textDark },
   rowSub: { fontSize: 12, fontWeight: "400", color: colors.textGray, marginTop: 2 },
   // ปุ่มลบห่างจากปุ่มแก้เพิ่มขึ้น — ลดโอกาสกดพลาด (บวกกับ confirm ก่อนลบ)
   deleteBtn: { marginLeft: 4 },
+  // ไอคอนปักหมุดมุมขวาบนของโน้ตที่ pinned
+  pinnedBadge: { position: "absolute", top: 5, right: 5 },
 
   footer: { fontSize: 12, fontWeight: "400", color: colors.textBody, textAlign: "center", marginTop: 18 },
+
+  // ---------- Viewer รูปเต็มจอ ----------
+  // พื้นหลังเข้มเกือบทึบ = textDark (#5A3419) ที่ opacity สูง
+  viewerBackdrop: { flex: 1, backgroundColor: "rgba(90,52,25,0.97)", alignItems: "center", justifyContent: "center" },
+  viewerImageWrap: { width: "100%", height: "78%", alignItems: "center", justifyContent: "center" },
+  viewerImage: { width: "100%", height: "100%" },
+  viewerCloseWrap: { position: "absolute", top: 48, right: 16 },
+  viewerCloseBtn: { backgroundColor: "rgba(255,255,255,0.15)" },
 });
 
 export default NotesScreen;

@@ -1,18 +1,20 @@
 /** กราฟพื้นที่  */
 import { useState, useRef, useEffect } from "react";
-import { View, Animated } from "react-native";
-import { Svg, Path, Defs, LinearGradient, Stop, Circle, Line, Rect, Text } from "react-native-svg";
+import { View, Animated, StyleSheet } from "react-native";
+import { Svg, Path, Defs, LinearGradient, Stop, Circle, Line, Rect, Text as SvgText } from "react-native-svg";
 
+import AppText from "../components/AppText";
 import { colors } from "../theme";
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 const H = 130;
-const PAD_X = 12;
-const PAD_TOP = 20; 
-const PAD_BOTTOM = 10;
+const PAD_X = 20;
+const PAD_TOP = 20;
+// เผื่อที่ว่างใต้แกน X สำหรับ label วันที่
+const PAD_BOTTOM = 26;
 
-function SimpleLineChart({ data, healthyRange }) {
+function SimpleLineChart({ data, healthyRange, labels }) {
   const [width, setWidth] = useState(300);
   const draw = useRef(new Animated.Value(0)).current;
 
@@ -32,9 +34,15 @@ function SimpleLineChart({ data, healthyRange }) {
   const min = Math.min(...data);
   const range = max - min || 1;
   const n = data.length;
+  // ยืด domain ให้ min/max ไม่ชิดขอบบน-ล่างของกราฟ
+  const domPad = range * 0.15;
+  const domMin = min - domPad;
+  const domMax = max + domPad;
   const stepX = n === 1 ? 0 : (W - 2 * PAD_X) / (n - 1);
   const x = (i) => PAD_X + i * stepX;
-  const y = (v) => H - PAD_BOTTOM - ((v - min) / range) * (H - PAD_TOP - PAD_BOTTOM);
+  const y = (v) => H - PAD_BOTTOM - ((v - domMin) / (domMax - domMin)) * (H - PAD_TOP - PAD_BOTTOM);
+  // แสดงตัวเลขแบบตัดศูนย์ท้าย เช่น 5.8, 6
+  const fmt = (v) => String(Math.round(v * 10) / 10);
 
   const pts = data.map((v, i) => ({ x: x(i), y: y(v) }));
   const line = pts
@@ -77,7 +85,7 @@ function SimpleLineChart({ data, healthyRange }) {
           width={W}
           height={height}
           fill={colors.greenDark}
-          opacity={0.08}
+          opacity={0.14}
         />
       );
     }
@@ -87,6 +95,7 @@ function SimpleLineChart({ data, healthyRange }) {
     <View
       style={{ width: "100%", marginVertical: 12 }}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      accessibilityLabel={`กราฟแนวโน้ม มี ${n} จุด ค่าล่าสุด ${fmt(data[n - 1])}${healthyRange && healthyRange.length === 2 ? " พร้อมช่วงสุขภาพ" : ""}`}
     >
       <Svg width={W} height={H}>
         <Defs>
@@ -96,7 +105,7 @@ function SimpleLineChart({ data, healthyRange }) {
           </LinearGradient>
         </Defs>
         {band}
-        {gridValues.map((v, i) => (
+        {gridValues.flatMap((v, i) => [
           <Line
             key={`g${i}`}
             x1={0}
@@ -107,8 +116,20 @@ function SimpleLineChart({ data, healthyRange }) {
             strokeWidth={1}
             strokeDasharray="3,3"
             opacity={0.5}
-          />
-        ))}
+          />,
+          // ตัวเลขกำกับเส้น grid ฝั่งซ้าย
+          <SvgText
+            key={`gl${i}`}
+            x={4}
+            y={y(v) + 3}
+            fontSize={10}
+            fontFamily="Kanit_400Regular"
+            fill={colors.textGray}
+            textAnchor="start"
+          >
+            {fmt(v)}
+          </SvgText>,
+        ])}
         <AnimatedPath d={area} fill="url(#weightArea)" opacity={areaOpacity} />
         <AnimatedPath
           d={line}
@@ -123,23 +144,55 @@ function SimpleLineChart({ data, healthyRange }) {
         {pts.map((p, i) => (
           <Circle key={`c${i}`} cx={p.x} cy={p.y} r={3} fill={colors.greenDark} opacity={lateOpacity} />
         ))}
-        {pts.map((p, i) => (
-          <Text
-            key={`l${i}`}
-            x={p.x}
-            y={p.y - 6}
-            fontSize={12}
-            fontFamily="BaiJamjuree_700Bold"
-            fill={colors.textGray}
-            textAnchor="middle"
-            opacity={lateOpacity}
-          >
-            {String(data[i])}
-          </Text>
-        ))}
+        {/* ตัวเลขค่าเฉพาะจุดแรกและสุดท้าย กันข้อความซ้อนกัน */}
+        {pts.map((p, i) =>
+          i === 0 || i === n - 1 ? (
+            <SvgText
+              key={`l${i}`}
+              x={p.x}
+              y={p.y - 6}
+              fontSize={11}
+              fontFamily="Kanit_700Bold"
+              fill={colors.textBody}
+              textAnchor="middle"
+              opacity={lateOpacity}
+            >
+              {fmt(data[i])}
+            </SvgText>
+          ) : null
+        )}
+        {/* label แกน X — จุดแรก/กลาง/ล่าสุด */}
+        {(n === 1 ? [0] : [...new Set([0, Math.floor((n - 1) / 2), n - 1])]).map((idx, k) =>
+          labels && labels[idx] ? (
+            <SvgText
+              key={`xl${k}`}
+              x={x(idx)}
+              y={H - 6}
+              fontSize={10}
+              fontFamily="Kanit_400Regular"
+              fill={colors.textGray}
+              textAnchor="middle"
+            >
+              {labels[idx]}
+            </SvgText>
+          ) : null
+        )}
       </Svg>
+      {/* legend ช่วงสุขภาพ — แสดงเมื่อมี healthyRange */}
+      {band && (
+        <View style={styles.legendRow}>
+          <View style={styles.legendDot} />
+          <AppText style={styles.legendText}>ช่วงสุขภาพ</AppText>
+        </View>
+      )}
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  legendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  legendDot: { width: 10, height: 10, borderRadius: 3, backgroundColor: colors.greenDark, opacity: 0.3 },
+  legendText: { fontSize: 11, fontWeight: "400", color: colors.textGray },
+});
 
 export default SimpleLineChart;

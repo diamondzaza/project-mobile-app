@@ -1,78 +1,63 @@
 /** หน้าเข้าสู่ระบบ  */
 import { useState } from "react";
-import { SafeAreaView, View, Pressable, Image, StyleSheet } from "react-native";
-import { User, Mail, Lock } from "lucide-react-native";
+import { SafeAreaView, View, Pressable, Image, StyleSheet, Alert } from "react-native";
+import { Lock, User } from "lucide-react-native";
 
 import AppText from "../components/AppText";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import AuthField from "../components/AuthField";
 import GoogleIcon from "../components/GoogleIcon";
 import { Card, CardContent, Button } from "../components/ui";
-import { colors, radius, glass } from "../theme";
+import { colors } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 
 
-const METHODS = [
-  {
-    key: "username",
-    label: "ชื่อผู้ใช้",
-    icon: User,
-    placeholder: "ชื่อผู้ใช้ของคุณ",
-    keyboardType: "default",
-    validate: (v) => v.trim().length >= 3 || "ชื่อผู้ใช้ต้องมีความยาวอย่างน้อย 3 ตัวอักษร",
-  },
-  {
-    key: "email",
-    label: "อีเมล",
-    icon: Mail,
-    placeholder: "email@example.com",
-    keyboardType: "email-address",
-    validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || "รูปแบบอีเมลไม่ถูกต้อง",
-  },
-];
+// ช่องเดียวรับทั้งอีเมลและชื่อผู้ใช้ — มี @ = ตรวจรูปแบบอีเมล, ไม่มี = ชื่อผู้ใช้ (3+ ตัว ไม่มีเว้นวรรค)
+const validateIdentifier = (v) => {
+  const t = v.trim();
+  if (t.includes("@")) return /\S+@\S+\.\S+/.test(t) || "รูปแบบอีเมลไม่ถูกต้อง";
+  return (t.length >= 3 && !/\s/.test(t)) || "ชื่อผู้ใช้ต้องมีอย่างน้อย 3 ตัวอักษร ไม่มีเว้นวรรค";
+};
 
 function LoginScreen({ go, submitLogin, submitGoogle }) {
-  const [method, setMethod] = useState(METHODS[0]);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(null); // error จาก server/Google แสดงเหนือปุ่มเข้าสู่ระบบ
   const [busy, setBusy] = useState(false);
-
-  const switchMethod = (m) => {
-    setMethod(m);
-    setIdentifier("");
-    setErrors({});
-  };
-
 
   const submit = async () => {
     if (busy) return;
-    const idResult = method.validate(identifier);
+    setFormError(null);
+    const idResult = validateIdentifier(identifier);
     const next = {};
     if (idResult !== true) next.identifier = idResult;
     if (password.trim().length < 6) next.password = "รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร";
     setErrors(next);
     if (Object.keys(next).length) return;
 
-    // Supabase Auth รองรับ email (username ยังไม่รองรับ)
-    if (method.key === "username") {
-      setErrors({ identifier: "โปรดเข้าสู่ระบบด้วยอีเมล" });
-      return;
-    }
     setBusy(true);
     const res = await submitLogin(identifier, password);
     setBusy(false);
-    if (!res.ok) setErrors({ password: res.error });
+    // error จาก server แสดงเป็นข้อความเตือนกลาง ไม่ยัดลงช่องรหัสผ่าน
+    if (!res.ok) setFormError(res.error);
   };
 
 
   const loginWithGoogle = async () => {
     if (busy) return;
+    setFormError(null);
     setBusy(true);
     const res = await submitGoogle();
     setBusy(false);
-    if (!res.ok) setErrors({ password: res.error });
+    if (!res.ok) setFormError(res.error);
   };
+
+  const showForgotPassword = () =>
+    Alert.alert(
+      "ลืมรหัสผ่าน?",
+      "ระบบยังไม่มีหน้ารีเซ็ตรหัสผ่านอัตโนมัติ\nกรุณาติดต่อผู้ดูแลระบบเพื่อขอรีเซ็ตรหัสผ่านของคุณ"
+    );
 
   return (
     <SafeAreaView style={sharedStyles.container}>
@@ -91,33 +76,16 @@ function LoginScreen({ go, submitLogin, submitGoogle }) {
         <Card>
           <CardContent style={styles.cardContent}>
 
-            <View style={styles.methodRow}>
-              {METHODS.map((m) => {
-                const active = m.key === method.key;
-                return (
-                  <Pressable
-                    key={m.key}
-                    onPress={() => switchMethod(m)}
-                    style={[styles.methodTab, active ? styles.methodTabActive : glass.surface]}
-                  >
-                    <AppText style={[styles.methodTabText, active && styles.methodTabTextActive]}>
-                      {m.label}
-                    </AppText>
-                  </Pressable>
-                );
-              })}
-            </View>
-
             <AuthField
-              label={method.label}
-              icon={method.icon}
+              label="อีเมลหรือชื่อผู้ใช้"
+              icon={User}
               value={identifier}
               onChangeText={(t) => {
                 setIdentifier(t);
                 setErrors((e) => ({ ...e, identifier: null }));
+                setFormError(null);
               }}
-              placeholder={method.placeholder}
-              keyboardType={method.keyboardType}
+              placeholder="you@email.com หรือ ชื่อผู้ใช้"
               error={errors.identifier}
             />
             <AuthField
@@ -132,6 +100,19 @@ function LoginScreen({ go, submitLogin, submitGoogle }) {
               secure
               error={errors.password}
             />
+            <View style={styles.forgotRow}>
+              <Pressable
+                onPress={showForgotPassword}
+                hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                style={({ pressed }) => [pressed && { opacity: 0.85 }]}
+                accessibilityRole="button"
+                accessibilityLabel="ลืมรหัสผ่าน"
+              >
+                <AppText style={styles.forgotText}>ลืมรหัสผ่าน?</AppText>
+              </Pressable>
+            </View>
+
+            {formError ? <AppText style={styles.formErrorText}>{formError}</AppText> : null}
 
             <Button
               title={busy ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
@@ -160,7 +141,7 @@ function LoginScreen({ go, submitLogin, submitGoogle }) {
 
         <View style={styles.footerRow}>
           <AppText style={styles.footerText}>ยังไม่มีบัญชีใช่ไหม?</AppText>
-          <Pressable onPress={() => go("register")} hitSlop={8}>
+          <Pressable onPress={() => go("register")} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
             <AppText style={styles.footerLink}>สมัครสมาชิก</AppText>
           </Pressable>
         </View>
@@ -176,11 +157,10 @@ const styles = StyleSheet.create({
   title: { fontSize: 26, fontWeight: "700", color: colors.textDark, textAlign: "center" },
   subtitle: { fontSize: 14, fontWeight: "400", color: colors.textGray, textAlign: "center", marginTop: 6, marginBottom: 24 },
   cardContent: { paddingTop: 16 },
-  methodRow: { flexDirection: "row", gap: 8, marginBottom: 18 },
-  methodTab: { flex: 1, height: 38, borderRadius: radius.sm, alignItems: "center", justifyContent: "center" },
-  methodTabActive: { backgroundColor: "#A8552E" },
-  methodTabText: { fontSize: 13, fontWeight: "400", color: colors.textBody },
-  methodTabTextActive: { color: "#FFFFFF", fontWeight: "600" },
+  // ลิงก์ลืมรหัสผ่าน — ชิดขวาใต้ช่องรหัสผ่าน (ใต้บรรทัด error ด้วย)
+  forgotRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 8 },
+  forgotText: { fontSize: 13, fontWeight: "600", color: colors.accentDeep, textDecorationLine: "underline" },
+  formErrorText: { fontSize: 13, fontWeight: "600", color: colors.danger, textAlign: "center", marginBottom: 10 },
   primaryButton: { width: "100%", marginTop: 4 },
   dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 18, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },

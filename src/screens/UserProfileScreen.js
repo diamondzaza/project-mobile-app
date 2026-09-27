@@ -1,7 +1,6 @@
 /** หน้าจอโปรไฟล์ของเจ้าของ*/
 import { SafeAreaView, View, Pressable, Alert, Image, StyleSheet } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { LogOut } from "lucide-react-native";
+import { LogOut, Pencil, User, Camera, Mail, Phone } from "lucide-react-native";
 import * as ImagePicker from "expo-image-picker";
 
 import Card from "../components/Card";
@@ -55,58 +54,90 @@ function UserProfileScreen({ go, user, pets = [], appointments = [], notificatio
         <GradientSurface variant="cover" style={styles.profileCover}>
           <View style={{ width: 32 }} />
           <AppText style={styles.headerTitle}>โปรไฟล์ของฉัน</AppText>
-          <Pressable onPress={() => go("editProfile")} style={styles.editFab}>
-            <Feather name="edit-2" size={16} color={colors.brown} />
+          <Pressable
+            onPress={() => go("editProfile")}
+            style={({ pressed }) => [styles.editFab, pressed && { opacity: 0.85 }]}
+            accessibilityRole="button"
+            accessibilityLabel="แก้ไขโปรไฟล์"
+          >
+            <Pencil size={18} color={colors.brown} strokeWidth={2} />
           </Pressable>
         </GradientSurface>
 
         <View style={{ alignItems: "center", marginTop: -46 }}>
-          <Pressable style={styles.avatarOuter} onPress={pickPhoto}>
+          <Pressable style={({ pressed }) => [styles.avatarOuter, pressed && { opacity: 0.85 }]} onPress={pickPhoto}>
             <View style={styles.ownerAvatarLarge}>
               {user.photo ? (
                 <Image source={{ uri: user.photo }} style={styles.ownerAvatarImg} resizeMode="cover" />
               ) : (
-                <Feather name="user" size={44} color={colors.brownLight} />
+                <User size={44} color={colors.brownLight} strokeWidth={2} />
               )}
             </View>
             <View style={styles.avatarCameraBadge}>
-              <Feather name="camera" size={14} color="#fff" />
+              <Camera size={14} color={colors.white} strokeWidth={2} />
             </View>
           </Pressable>
           <AppText style={styles.ownerNameLarge}>{user.name}</AppText>
-          <View style={styles.contactRow}>
-            <Feather name="mail" size={13} color={colors.textGray} />
-            <AppText style={styles.contactText}>{user.email}</AppText>
-          </View>
-          <View style={styles.contactRow}>
-            <Feather name="phone" size={13} color={colors.textGray} />
-            <AppText style={styles.contactText}>{user.phone}</AppText>
-          </View>
+          {user.email ? (
+            <View style={styles.contactRow}>
+              <Mail size={13} color={colors.textGray} strokeWidth={2} />
+              <AppText style={styles.contactText}>{user.email}</AppText>
+            </View>
+          ) : null}
+          {user.phone ? (
+            <View style={styles.contactRow}>
+              <Phone size={13} color={colors.textGray} strokeWidth={2} />
+              <AppText style={styles.contactText}>{user.phone}</AppText>
+            </View>
+          ) : null}
         </View>
 
         <Reveal>
           <View style={styles.statsRow}>
-            <StatBox
-              icon="heart"
-              label="สัตว์เลี้ยง"
-              value={pets.length}
-              bgColor={category.food.soft}
-              iconColor={category.food.main}
-            />
-            <StatBox
-              icon="calendar"
-              label="นัดหมาย"
-              value={upcomingCount}
-              bgColor={category.appointments.soft}
-              iconColor={category.appointments.main}
-            />
-            <StatBox
-              icon="bell"
-              label="ยังไม่ได้อ่าน"
-              value={unreadCount}
-              bgColor={category.health.soft}
-              iconColor={category.health.main}
-            />
+            <Pressable
+              onPress={() => go("home")}
+              style={({ pressed }) => [styles.statHit, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="สัตว์เลี้ยง ไปหน้าหลัก"
+            >
+              <StatBox
+                icon="heart"
+                label="สัตว์เลี้ยง"
+                value={pets.length}
+                bgColor={category.food.soft}
+                iconColor={category.food.main}
+              />
+            </Pressable>
+            <Pressable
+              onPress={() => go("overallAppointments")}
+              style={({ pressed }) => [styles.statHit, pressed && { opacity: 0.85 }]}
+              accessibilityRole="button"
+              accessibilityLabel="นัดหมาย ไปหน้านัดหมายทั้งหมด"
+            >
+              <StatBox
+                icon="calendar"
+                label="นัดหมาย"
+                value={upcomingCount}
+                bgColor={category.appointments.soft}
+                iconColor={category.appointments.main}
+              />
+            </Pressable>
+            {unreadCount > 0 && (
+              <Pressable
+                onPress={() => go("notifications")}
+                style={({ pressed }) => [styles.statHit, pressed && { opacity: 0.85 }]}
+                accessibilityRole="button"
+                accessibilityLabel="ยังไม่ได้อ่าน ไปหน้าการแจ้งเตือน"
+              >
+                <StatBox
+                  icon="bell"
+                  label="ยังไม่ได้อ่าน"
+                  value={unreadCount}
+                  bgColor={category.health.soft}
+                  iconColor={category.health.main}
+                />
+              </Pressable>
+            )}
           </View>
         </Reveal>
 
@@ -126,7 +157,8 @@ function UserProfileScreen({ go, user, pets = [], appointments = [], notificatio
               <View style={styles.divider} />
               <SettingsRow
                 icon="lock"
-                label="ความเป็นส่วนตัวและความปลอดภัย"
+                label="ความเป็นส่วนตัวและความปลอดภัย (เร็ว ๆ นี้)"
+                dim
                 onPress={() => Alert.alert("ความเป็นส่วนตัวและความปลอดภัย", "เร็ว ๆ นี้")}
               />
             </Card>
@@ -135,7 +167,8 @@ function UserProfileScreen({ go, user, pets = [], appointments = [], notificatio
             <Card style={{ padding: 0, overflow: "hidden" }}>
               <SettingsRow
                 icon="help-circle"
-                label="ศูนย์ช่วยเหลือ"
+                label="ศูนย์ช่วยเหลือ (เร็ว ๆ นี้)"
+                dim
                 onPress={() => Alert.alert("ศูนย์ช่วยเหลือ", "เร็ว ๆ นี้")}
               />
               <View style={styles.divider} />
@@ -151,13 +184,13 @@ function UserProfileScreen({ go, user, pets = [], appointments = [], notificatio
               variant="destructive"
               size="lg"
               onPress={confirmLogout}
-              iconLeft={<LogOut size={18} color="#FFFFFF" strokeWidth={2.2} />}
+              iconLeft={<LogOut size={18} color={colors.white} strokeWidth={2.2} />}
               style={{ width: "100%", marginTop: 20, marginBottom: 10 }}
             />
           </View>
         </Reveal>
       </AnimatedScrollView>
-      <BottomTabBar active="userProfile" go={go} anim={tabBar.anim} />
+      <BottomTabBar active="userProfile" go={go} anim={tabBar.anim} unreadCount={unreadCount} />
     </SafeAreaView>
   );
 }
@@ -175,9 +208,9 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
   editFab: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: colors.cardBg,
     alignItems: "center",
     justifyContent: "center",
@@ -222,7 +255,10 @@ const styles = StyleSheet.create({
   contactRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
   contactText: { fontSize: 13, fontWeight: "400", color: colors.textGray },
   statsRow: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 20, marginTop: 24, gap: 12 },
-  settingsSectionTitle: { fontSize: 13, fontWeight: "600", color: colors.textBody, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+  // ครอบ StatBox ให้กดได้ทั้งก้อน
+  statHit: { flex: 1 },
+  // หัวข้อ section ภาษาไทย — ไม่ใช้ uppercase/letterSpacing
+  settingsSectionTitle: { fontSize: 13, fontWeight: "600", color: colors.textBody, marginBottom: 10 },
   divider: { height: 1, backgroundColor: colors.border, marginLeft: 62 },
 });
 

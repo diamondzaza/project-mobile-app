@@ -13,7 +13,7 @@ const PAD_LEFT = 34;
 const PAD_RIGHT = 6;
 const GRID_LINES = 3; 
 
-function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIndex = null, mutedFill = "#A07048" }) {
+function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIndex = null, mutedFill = colors.brown }) {
   const [width, setWidth] = useState(300);
   const [tooltipIndex, setTooltipIndex] = useState(null);
   const anim = useRef(new Animated.Value(0)).current;
@@ -47,7 +47,8 @@ function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIn
   const opacity = anim;
   const translateY = anim.interpolate({ inputRange: [0, 1], outputRange: [14, 0] });
 
-  const gridValues = Array.from({ length: GRID_LINES }, (_, i) => axisMax * ((i + 1) / (GRID_LINES + 0)));
+  // แบ่ง grid เป็น GRID_LINES ช่วงเท่า ๆ กัน (เดิมหารด้วย GRID_LINES ทำเส้นบนสุดตรง axisMax)
+  const gridValues = Array.from({ length: GRID_LINES }, (_, i) => axisMax * ((i + 1) / (GRID_LINES + 1)));
 
   const tip = tooltipIndex != null ? rows[tooltipIndex] : null;
   const toggleTip = (i) => setTooltipIndex((prev) => (prev === i ? null : i));
@@ -56,6 +57,7 @@ function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIn
     <View
       style={{ width: "100%", marginVertical: 8 }}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
+      accessibilityLabel={`กราฟแท่งสถิติ ${rows.length} ช่วง ค่าสูงสุด ${Math.round(max)} ${unit}`}
     >
       <View style={styles.tooltipRow}>
         {tip ? (
@@ -82,13 +84,13 @@ function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIn
               strokeDasharray="3,3"
               opacity={0.6}
             />,
-            <SvgText key={`gt${i}`} x={PAD_LEFT - 6} y={y(v) + 3} fontSize={12} fontFamily="BaiJamjuree_400Regular" fill={colors.textBody} textAnchor="end">
+            <SvgText key={`gt${i}`} x={PAD_LEFT - 6} y={y(v) + 3} fontSize={12} fontFamily="Kanit_400Regular" fill={colors.textBody} textAnchor="end">
               {Math.round(v)}
             </SvgText>,
           ])}
           {/* baseline */}
           <Line x1={PAD_LEFT} y1={baseY} x2={W} y2={baseY} stroke={colors.textBody} strokeWidth={1} opacity={0.4} />
-          <SvgText x={PAD_LEFT - 6} y={baseY + 3} fontSize={12} fontFamily="BaiJamjuree_400Regular" fill={colors.textBody} textAnchor="end">
+          <SvgText x={PAD_LEFT - 6} y={baseY + 3} fontSize={12} fontFamily="Kanit_400Regular" fill={colors.textBody} textAnchor="end">
             0
           </SvgText>
           {rows.map((d, i) => {
@@ -103,7 +105,10 @@ function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIn
                 height={h}
                 rx={4}
                 fill={fillOf(i)}
-                opacity={d.value > 0 ? 1 : 0.25}
+                opacity={d.value > 0 ? (tooltipIndex === i ? 1 : 0.85) : 0.25}
+                // แท่งที่ถูกเลือกมีขอบเข้มและทึบกว่าแท่งอื่น
+                stroke={tooltipIndex === i ? colors.accentDeep : "transparent"}
+                strokeWidth={tooltipIndex === i ? 1.5 : 0}
                 onPress={() => toggleTip(i)}
               />
             );
@@ -122,22 +127,24 @@ function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIn
               />
             );
           })}
-          {rows.map((d, i) => {
-            const cx = PAD_LEFT + slot * i + slot / 2;
-            return (
-              <SvgText
-                key={`v${i}`}
-                x={cx}
-                y={baseY - barH(d.value) - 6}
-                fontSize={12}
-                fontFamily="BaiJamjuree_700Bold"
-                fill={colors.textBody}
-                textAnchor="middle"
-              >
-                {d.value > 0 ? Math.round(d.value) : ""}
-              </SvgText>
-            );
-          })}
+          {/* ตัวเลขบนแท่ง — แสดงเฉพาะเมื่อแท่งไม่เยอะ กันตัวเลขชนกัน */}
+          {rows.length <= 7 &&
+            rows.map((d, i) => {
+              const cx = PAD_LEFT + slot * i + slot / 2;
+              return (
+                <SvgText
+                  key={`v${i}`}
+                  x={cx}
+                  y={baseY - barH(d.value) - 6}
+                  fontSize={12}
+                  fontFamily="Kanit_700Bold"
+                  fill={colors.textBody}
+                  textAnchor="middle"
+                >
+                  {d.value > 0 ? Math.round(d.value) : ""}
+                </SvgText>
+              );
+            })}
           {rows.map((d, i) => {
             const cx = PAD_LEFT + slot * i + slot / 2;
             return (
@@ -146,7 +153,7 @@ function SimpleBarChart({ data, accent = colors.greenDark, unit = "min", todayIn
                 x={cx}
                 y={H - 8}
                 fontSize={12}
-                fontFamily={todayIndex === i ? "BaiJamjuree_600SemiBold" : "BaiJamjuree_400Regular"}
+                fontFamily={todayIndex === i ? "Kanit_600SemiBold" : "Kanit_400Regular"}
                 fill={todayIndex === i ? colors.textDark : colors.textBody}
                 textAnchor="middle"
               >
@@ -168,7 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  tooltipText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
+  tooltipText: { color: colors.white, fontSize: 12, fontWeight: "600" },
   unitHint: { color: colors.textBody, fontSize: 12, fontWeight: "400" },
 });
 

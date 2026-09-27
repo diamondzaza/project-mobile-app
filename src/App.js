@@ -1,6 +1,6 @@
 /** คอมโพเนนต์หลักของแอป */
 import { useState, useEffect, useRef, Suspense } from "react";
-import { BackHandler, Alert, View } from "react-native";
+import { BackHandler, Alert, View, Animated, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import {
@@ -11,6 +11,7 @@ import {
   SubscriptionScreen,
   HomeScreen,
   AddPetScreen,
+  EditPetScreen,
   PetProfileScreen,
   WeightScreen,
   HealthScreen,
@@ -25,13 +26,34 @@ import {
 } from "./screens";
 import { MEAL_REMINDERS, DEFAULT_FOOD_GOAL_G, DEFAULT_ACTIVITY_GOAL_MIN, DEFAULT_WALK_REMINDER_HOUR, PET_LIMITS, AD_LEVELS } from "./data/constants";
 import { isSameDate } from "./utils/date";
-import { gradient } from "./theme";
+import { gradient, colors } from "./theme";
 import { supabase, isSupabaseConfigured } from "./lib/supabase";
 import * as authApi from "./lib/auth";
 import * as db from "./lib/db";
 import { uploadPhoto } from "./lib/storage";
 import { uuid } from "./lib/id";
 import { initNotifications, showReminder } from "./lib/notifications";
+import { preloadScreens } from "./screens";
+
+/** 4 หน้าแท็บหลัก — go() จะทำ pop-to-root เมื่อกดสลับหน้าเหล่านี้ */
+const TAB_SCREENS = ["home", "notifications", "overallAppointments", "userProfile"];
+
+/** เปลี่ยนหน้าแบบ fade-in 250ms — เดิมเป็น hard cut กระตุกขณะภายในหน้ากลับมี animation เยอะ */
+function FadeScreen({ children }) {
+  const fade = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fade, { toValue: 1, duration: 250, useNativeDriver: true }).start();
+  }, [fade]);
+  return <Animated.View style={{ flex: 1, opacity: fade }}>{children}</Animated.View>;
+}
+
+function LoadingFallback() {
+  return (
+    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+      <ActivityIndicator size="large" color={colors.accentDeep} />
+    </View>
+  );
+}
 
 export default function App() {
   // ไม่ได้ตั้งค่า .env → แสดงหน้าแนะนำการตั้งค่า (ไม่มีโหมด mock แล้ว)
@@ -156,6 +178,13 @@ function AppInner() {
     initNotifications();
   }, []);
 
+  // หลังแอปพร้อม + หน้าแรกแสดงแล้ว ค่อยโหลด chunk ของหน้าอื่นในพื้นหลัง (กดเปลี่ยนหน้าไม่ต้องรอ)
+  useEffect(() => {
+    if (!authReady) return;
+    const t = setTimeout(() => preloadScreens(), 1200);
+    return () => clearTimeout(t);
+  }, [authReady]);
+
   // ตรวจ session ตอนเปิดแอป + รองรับ Google OAuth redirect กลับเข้ามา
   useEffect(() => {
     if (!isSupabaseConfigured) return;
@@ -250,7 +279,12 @@ function AppInner() {
     }
   };
 
-  const go = (s) => setScreenStack((prev) => [...prev, s]);
+  const go = (s) =>
+    setScreenStack((prev) => {
+      // Tab ทำงานแบบ switch (pop-to-root) ไม่ใช่ push — เดิมกดสลับแท็บไปมาแล้ว stack ลึกไม่จำกัด ปุ่ม back ต้องไล่ผ่านหน้าซ้ำ
+      if (TAB_SCREENS.includes(s)) return [s];
+      return [...prev, s];
+    });
 
   
   const selectPet = (id) => {
@@ -260,13 +294,9 @@ function AppInner() {
 
   
   const addPet = (newPet, initialWeight) => {
-    // บังคับจำนวนสัตว์เลี้ยงตามแพ็กเกจ (null = ไม่จำกัด)
+    // บังคับจำนวนสัตว์เลี้ยงตามแพ็กเกจ (null = ไม่จำกัด) — false = ถูกบล็อก (UX แจ้งเตือนอยู่ที่ AddPetScreen)
     const limit = PET_LIMITS[tier];
     if (limit != null && pets.length >= limit) {
-      Alert.alert(
-        "จำนวนสัตว์เลี้ยงเต็มตามแพ็กเกจ",
-        `แพ็กเกจปัจจุบันรองรับสูงสุด ${limit} ตัว (มีอยู่ ${pets.length} ตัว)\nอัปเกรดแพ็กเกจเพื่อเพิ่มสัตว์เลี้ยงได้ที่ "แพ็กเกจของฉัน" ในหน้าโปรไฟล์`
-      );
       return false;
     }
     const pet = { ...newPet, id: uuid() }; // DB ใช้ uuid
@@ -305,13 +335,39 @@ function AppInner() {
     if (cloud) mirror(db.deletePet(id));
   }
 
+  /** แก้ไขข้อมูลสัตว์เลี้ยง (patch บางส่วน — จาก EditPetScreen) */
+  const savePetEdit = (petId, patch) => {
+    setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, ...patch } : p)));
+    if (cloud) mirror(db.updatePet(userId, petId, patch));
+  };
 
-  const addWeightEntry = (petId, value, date) => {
+  /** เปลี่ยนรูปสัตว์เลี้ยง — อัปโหลดขึ้น Storage แล้วอัปเดต state ด้วย local uri ทันที */
+  const savePetPhoto = (petId, localUri) => {
+    setPets((prev) => prev.map((p) => (p.id === petId ? { ...p, photo: localUri } : p)));
+    if (cloud) mirror(db.setPetPhoto(userId, petId, localUri));
+  };
+
+
+  /** บันทึกน้ำหนักแบบ upsert ตามวันที่ (วันเดียวมีค่าเดียว — ใช้ทั้งเพิ่มและแก้ไขจากหน้าน้ำหนัก) */
+  const saveWeightEntry = (petId, value, date) => {
+    setWeightData((prev) => {
+      const list = prev[petId] || [];
+      const idx = list.findIndex((e) => isSameDate(new Date(e.date), date));
+      const next =
+        idx >= 0
+          ? list.map((e, i) => (i === idx ? { ...e, value } : e))
+          : [...list, { value, date: date.toISOString() }];
+      return { ...prev, [petId]: next };
+    });
+    if (cloud) mirror(db.upsertWeight(userId, petId, { value, date: date.toISOString() }));
+  };
+
+  const removeWeightEntry = (petId, date) => {
     setWeightData((prev) => ({
       ...prev,
-      [petId]: [...(prev[petId] || []), { value, date: date.toISOString() }],
+      [petId]: (prev[petId] || []).filter((e) => !isSameDate(new Date(e.date), date)),
     }));
-    if (cloud) mirror(db.upsertWeight(userId, petId, { value, date: date.toISOString() }));
+    if (cloud) mirror(db.deleteWeight(userId, petId, date));
   };
 
   const completeHealthItem = (petId, itemId) => {
@@ -339,7 +395,16 @@ function AppInner() {
         [petId]: { ...current, upcoming: [...current.upcoming, withId] },
       };
     });
-    if (cloud) mirror(db.insertHealthItem(userId, petId, withId));
+    if (cloud) {
+      mirror(async () => {
+        // แนบรูป (ใบรับรองวัคซีน/ไฟล์) อัปโหลดขึ้น Storage ก่อนแล้วค่อยบันทึกแถว
+        let photoPath = null;
+        if (withId.photo) {
+          photoPath = await uploadPhoto(userId, withId.id, "health", withId.photo);
+        }
+        await db.insertHealthItem(userId, petId, withId, photoPath);
+      });
+    }
   };
 
   const addAppointment = (appt) => {
@@ -350,6 +415,17 @@ function AppInner() {
   const removeAppointment = (id) => {
     setAppointments((prev) => prev.filter((a) => a.id !== id));
     if (cloud) mirror(db.deleteAppointment(id));
+  };
+
+  const markAppointmentDone = (id) => {
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, status: "done" } : a)));
+    if (cloud) mirror(db.setAppointmentStatus(id, "done"));
+  };
+
+  /** แก้ไขนัดหมาย (patch บางส่วน — จาก AppointmentForm โหมดแก้ไข) */
+  const editAppointment = (id, patch) => {
+    setAppointments((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+    if (cloud) mirror(db.updateAppointment(userId, id, patch));
   };
 
   const markRead = (id) => {
@@ -378,7 +454,8 @@ function AppInner() {
       setActivePetId(n.petId);
       setScreenStack((prev) => [...prev, n.screen]);
     } else {
-      setScreenStack((prev) => [...prev, "home"]);
+      // ไม่มี petId = กลับ root ตรงๆ — เดิม push "home" ซ้อนทำให้ back กลับไปเจอหน้าเดิมอีกรอบ
+      setScreenStack(["home"]);
     }
   };
 
@@ -490,7 +567,11 @@ function AppInner() {
   };
 
   const back = () =>
-    setScreenStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : ["home"]));
+    setScreenStack((prev) => {
+      if (prev.length > 1) return prev.slice(0, -1);
+      // stack ชั้นเดียว = หน้า auth — ห้ามพุ่งเข้า Home ทั้งที่ยังไม่ได้ล็อกอิน (ให้ผู้ใช้กด Android back เพื่อออกจากแอปเอง)
+      return prev;
+    });
 
   const goWithBack = (s) => {
     if (s === "back") back();
@@ -702,6 +783,53 @@ function AppInner() {
     return () => clearInterval(timer);
   }, [appointments, tier, notifications, cloud, userId, dataLoaded]);
 
+  // Engine 5: แจ้งเตือนรายการสุขภาพล่วงหน้า — ระยะวันต่อรายการ (remind_days_before 1/3/7 ตั้งที่หน้าสุขภาพ)
+  useEffect(() => {
+    const check = () => {
+      if (cloud && !dataLoaded) return;
+      const todayKey = db.localDateKey(new Date().toISOString());
+      const toAdd = [];
+      for (const pet of pets) {
+        if (reminderPrefs[pet.id] === false) continue; // ปิดการแจ้งเตือนของสัตว์ตัวนี้
+        for (const item of healthData[pet.id]?.upcoming || []) {
+          if (!item.dueDate) continue; // แจ้งเฉพาะรายการที่มีวันที่จริง (จากปฏิทิน)
+          // นับแบบปฏิทินเหมือน Engine 4
+          const diffDays = Math.round(
+            (new Date(db.localDateKey(item.dueDate)) - new Date(todayKey)) / 86400000
+          );
+          const lead = item.remindDaysBefore ?? 3;
+          if (diffDays < 0 || diffDays > lead) continue;
+          toAdd.push({
+            id: `health-${item.id}-${todayKey}`,
+            title:
+              diffDays === 0
+                ? `วันนี้! ${item.title} ของ ${pet.name}`
+                : `${item.title} ของ ${pet.name} อีก ${diffDays} วัน`,
+            time: "เมื่อสักครู่",
+            read: false,
+            petId: pet.id,
+            screen: "health",
+          });
+        }
+      }
+      if (toAdd.length === 0) return;
+      setNotifications((prev) => {
+        const existing = new Set(prev.map((n) => n.id));
+        const fresh = toAdd.filter((n) => !existing.has(n.id) && !dismissedReminderIdsRef.current.has(n.id));
+        for (const n of fresh) {
+          if (cloud) mirror(db.insertNotification(userId, n, "health"));
+          showReminder(n.title, "แตะเพื่อเปิดแอปและดูรายการสุขภาพ");
+        }
+        return fresh.length ? [...fresh, ...prev] : prev;
+      });
+    };
+    check();
+    const timer = setInterval(check, 60000);
+    return () => clearInterval(timer);
+  }, [pets, healthData, reminderPrefs, notifications, cloud, userId, dataLoaded]);
+
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   const renderScreen = () => {
     switch (screen) {
@@ -724,9 +852,9 @@ function AppInner() {
         />
       );
     case "home":
-      return <HomeScreen go={goWithBack} pets={pets} weightData={weightData} selectPet={selectPet} removePet={removePet} tier={tier} />;
+      return <HomeScreen go={goWithBack} pets={pets} weightData={weightData} selectPet={selectPet} removePet={removePet} tier={tier} unreadCount={unreadCount} />;
     case "addPet":
-      return <AddPetScreen go={back} addPet={addPet} />;
+      return <AddPetScreen go={back} addPet={addPet} goSubscription={() => goWithBack("subscription")} />;
     case "subscription":
       return <SubscriptionScreen go={goWithBack} tier={tier} petCount={pets.length} onActivate={activateTier} onCancel={cancelTier} />;
     case "petProfile":
@@ -743,6 +871,15 @@ function AppInner() {
           tier={tier}
         />
       );
+    case "editPet":
+      return (
+        <EditPetScreen
+          go={back}
+          activePet={activePet}
+          onSave={savePetEdit}
+          onSavePhoto={savePetPhoto}
+        />
+      );
 
     case "weight":
       return (
@@ -750,7 +887,8 @@ function AppInner() {
           go={back}
           activePet={activePet}
           weightData={weightData}
-          addWeightEntry={addWeightEntry}
+          saveWeightEntry={saveWeightEntry}
+          removeWeightEntry={removeWeightEntry}
         />
       );
     case "health":
@@ -771,6 +909,8 @@ function AppInner() {
           go={back}
           activePet={activePet}
           appointments={appointments}
+          markAppointmentDone={markAppointmentDone}
+          editAppointment={editAppointment}
           addAppointment={addAppointment}
           removeAppointment={removeAppointment}
         />
@@ -822,6 +962,7 @@ function AppInner() {
         <NotificationsScreen
           go={goWithBack}
           notifications={notifications}
+          loading={cloud && !dataLoaded}
           markRead={markRead}
           removeNotification={removeNotification}
           onOpen={openNotification}
@@ -834,6 +975,9 @@ function AppInner() {
           go={goWithBack}
           appointments={appointments}
           pets={pets}
+          unreadCount={unreadCount}
+          markAppointmentDone={markAppointmentDone}
+          editAppointment={editAppointment}
           addAppointment={addAppointment}
           removeAppointment={removeAppointment}
         />
@@ -861,13 +1005,28 @@ function AppInner() {
 
   // กำลังเช็ค session ตอนเปิดแอป (โหมด cloud) — แสดงพื้นหลังเปล่ารอสักครู่
   if (!authReady) {
-    return <LinearGradient colors={gradient.screen} style={{ flex: 1 }} />;
+    return (
+      <LinearGradient colors={gradient.screen} style={{ flex: 1 }}>
+        <LoadingFallback />
+      </LinearGradient>
+    );
+  }
+
+  // กำลังโหลดข้อมูลจาก DB — แสดงจอโหลดแทนหน้าที่ empty state จะหลอกว่า "ไม่มีข้อมูล"
+  if (cloud && !dataLoaded) {
+    return (
+      <LinearGradient colors={gradient.screen} style={{ flex: 1 }}>
+        <LoadingFallback />
+      </LinearGradient>
+    );
   }
 
   return (
     <LinearGradient colors={gradient.screen} style={{ flex: 1 }}>
       {/* หน้าจอเป็น lazy load — หน้าที่ยังไม่เปิดจะไม่ถูกประมวลผลตอนเปิดแอป */}
-      <Suspense fallback={<View style={{ flex: 1 }} />}>{renderScreen()}</Suspense>
+      <Suspense fallback={<LoadingFallback />}>
+        <FadeScreen key={screen}>{renderScreen()}</FadeScreen>
+      </Suspense>
     </LinearGradient>
   );
 }

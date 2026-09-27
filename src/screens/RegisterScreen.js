@@ -1,7 +1,7 @@
 /** หน้าสมัครสมาชิก*/
 import { useState } from "react";
 import { SafeAreaView, View, Pressable, StyleSheet } from "react-native";
-import { User, AtSign, Mail, Lock, KeyRound } from "lucide-react-native";
+import { User, AtSign, Mail, Lock, KeyRound, CheckCircle } from "lucide-react-native";
 
 import Header from "../components/Header";
 import AnimatedScrollView from "../components/AnimatedScrollView";
@@ -9,8 +9,16 @@ import AppText from "../components/AppText";
 import AuthField from "../components/AuthField";
 import GoogleIcon from "../components/GoogleIcon";
 import { Card, CardContent, Button } from "../components/ui";
-import { colors } from "../theme";
+import { colors, radius } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
+
+// error จาก server ที่ควรโผล่ที่ช่องอีเมล (อีเมลซ้ำ) แทนช่องรหัสผ่าน
+const EMAIL_TAKEN_PATTERN = /already|registered|duplicate|อีเมลนี้|ถูกใช้|ใช้แล้ว/i;
+
+const mapRegisterError = (message) =>
+  EMAIL_TAKEN_PATTERN.test(message || "")
+    ? { email: message }
+    : { password: message };
 
 
 const FIELDS = [
@@ -89,7 +97,7 @@ function RegisterScreen({ go, submitRegister, submitGoogle }) {
       phone: values.phone,
     });
     setBusy(false);
-    if (!res.ok) setErrors({ password: res.error });
+    if (!res.ok) setErrors(mapRegisterError(res.error));
     else if (res.needConfirm) setNotice("สมัครสำเร็จ! กรุณายืนยันอีเมลก่อนเข้าสู่ระบบ");
   };
 
@@ -112,23 +120,47 @@ function RegisterScreen({ go, submitRegister, submitGoogle }) {
       >
         <Card>
           <CardContent style={styles.cardContent}>
-            {FIELDS.map((f) => (
-              <AuthField
-                key={f.key}
-                label={f.label}
-                icon={f.icon}
-                value={values[f.key]}
-                onChangeText={(t) => setValue(f.key, t)}
-                placeholder={f.placeholder}
-                keyboardType={f.keyboardType}
-                autoCapitalize={f.autoCapitalize}
-                secure={f.secure}
-                error={errors[f.key]}
-              />
-            ))}
+            {FIELDS.map((f) =>
+              f.key === "password" ? (
+                // AuthField ไม่รองรับ hint — วาด label + hint เอง แล้วส่ง label={null} ให้ AuthField
+                <View key={f.key}>
+                  <View style={styles.passwordLabelRow}>
+                    <AppText style={styles.fieldLabel}>{f.label}</AppText>
+                    <AppText style={styles.fieldHint}>อย่างน้อย 6 ตัวอักษร</AppText>
+                  </View>
+                  <AuthField
+                    icon={f.icon}
+                    value={values[f.key]}
+                    onChangeText={(t) => setValue(f.key, t)}
+                    placeholder={f.placeholder}
+                    autoCapitalize={f.autoCapitalize}
+                    secure={f.secure}
+                    error={errors[f.key]}
+                  />
+                </View>
+              ) : (
+                <AuthField
+                  key={f.key}
+                  label={f.label}
+                  icon={f.icon}
+                  value={values[f.key]}
+                  onChangeText={(t) => setValue(f.key, t)}
+                  placeholder={f.placeholder}
+                  keyboardType={f.keyboardType}
+                  autoCapitalize={f.autoCapitalize}
+                  secure={f.secure}
+                  error={errors[f.key]}
+                />
+              )
+            )}
 
             {notice && (
-              <AppText style={styles.notice}>{notice}</AppText>
+              <View style={styles.noticeBanner}>
+                {/* พื้น success ที่ opacity ต่ำ — แยกเลเยอร์เพื่อไม่ให้ตัวหนังสือจางตาม */}
+                <View style={styles.noticeBannerBg} pointerEvents="none" />
+                <CheckCircle size={16} color={colors.success} strokeWidth={2} />
+                <AppText style={styles.noticeText}>{notice}</AppText>
+              </View>
             )}
 
             <Button
@@ -158,7 +190,7 @@ function RegisterScreen({ go, submitRegister, submitGoogle }) {
 
         <View style={styles.footerRow}>
           <AppText style={styles.footerText}>มีบัญชีอยู่แล้วใช่ไหม?</AppText>
-          <Pressable onPress={() => go("back")} hitSlop={8}>
+          <Pressable onPress={() => go("back")} hitSlop={8} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
             <AppText style={styles.footerLink}>เข้าสู่ระบบ</AppText>
           </Pressable>
         </View>
@@ -170,7 +202,21 @@ function RegisterScreen({ go, submitRegister, submitGoogle }) {
 const styles = StyleSheet.create({
   scrollContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 16, paddingBottom: 32 },
   cardContent: { paddingTop: 16 },
-  notice: { fontSize: 13, color: colors.brown, marginTop: 4, marginBottom: 8, textAlign: "center" },
+  passwordLabelRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 },
+  fieldLabel: { fontSize: 14, fontWeight: "600", color: colors.textBody },
+  fieldHint: { fontSize: 12, fontWeight: "400", color: colors.textGray },
+  noticeBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    borderRadius: radius.sm,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  noticeBannerBg: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.success, opacity: 0.12, borderRadius: radius.sm },
+  noticeText: { flex: 1, fontSize: 14, fontWeight: "600", color: colors.success },
   primaryButton: { width: "100%", marginTop: 4 },
   dividerRow: { flexDirection: "row", alignItems: "center", marginVertical: 18, gap: 10 },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },

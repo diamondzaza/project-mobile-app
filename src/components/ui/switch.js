@@ -10,7 +10,7 @@ export function ShadcnSwitch({ value, onValueChange, disabled }) {
       onValueChange={onValueChange}
       disabled={disabled}
       trackColor={{ false: "rgba(122,92,66,0.25)", true: colors.greenDark }}
-      thumbColor="#FFFFFF"
+      thumbColor={colors.white}
       ios_backgroundColor="rgba(122,92,66,0.25)"
     />
   );

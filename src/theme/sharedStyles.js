@@ -15,7 +15,7 @@ export const sharedStyles = StyleSheet.create({
     justifyContent: "center",
     ...glass.surface,
   },
-  input: { fontSize: 16, color: colors.textDark, fontFamily: "BaiJamjuree_400Regular" },
+  input: { fontSize: 16, color: colors.textDark, fontFamily: "Kanit_400Regular" },
   row: { flexDirection: "row", alignItems: "center", marginBottom: 12, padding: 14, ...glass.surface },
   rowTitle: { fontSize: 16, fontWeight: "600", color: colors.textDark },
   rowDate: { fontSize: 13, fontWeight: "400", color: colors.textGray, marginTop: 4 },
