@@ -152,7 +152,6 @@ function PetProfileScreen({ go, activePet, weightData, healthData, appointments,
           )}
 
           {/* ---------- Footer tip ---------- */}
-          <AppText style={styles.footerTip}>เคล็ดลับ: แตะหมวดหมู่เพื่อบันทึกหรือดูรายการ</AppText>
       </AnimatedScrollView>
     </SafeAreaView>
   );

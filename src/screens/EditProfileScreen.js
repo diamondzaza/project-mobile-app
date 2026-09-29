@@ -68,6 +68,7 @@ function EditProfileScreen({ go, user, updateUser }) {
             onChangeText={setEmail}
             placeholder="name@email.com"
             keyboardType="email-address"
+            inputMode="email"
             error={Boolean(emailError)}
             errorText={emailError}
           />
@@ -77,6 +78,7 @@ function EditProfileScreen({ go, user, updateUser }) {
             onChangeText={setPhone}
             placeholder="08x-xxx-xxxx"
             keyboardType="phone-pad"
+            inputMode="tel"
             error={Boolean(phoneError)}
             errorText={phoneError}
           />

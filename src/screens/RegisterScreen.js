@@ -43,6 +43,7 @@ const FIELDS = [
     icon: Mail,
     placeholder: "email@example.com",
     keyboardType: "email-address",
+    inputMode: "email",
     validate: (v) => /\S+@\S+\.\S+/.test(v.trim()) || "รูปแบบอีเมลไม่ถูกต้อง",
   },
   {
@@ -147,6 +148,7 @@ function RegisterScreen({ go, submitRegister, submitGoogle }) {
                   onChangeText={(t) => setValue(f.key, t)}
                   placeholder={f.placeholder}
                   keyboardType={f.keyboardType}
+                  inputMode={f.inputMode}
                   autoCapitalize={f.autoCapitalize}
                   secure={f.secure}
                   error={errors[f.key]}

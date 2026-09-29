@@ -23,6 +23,7 @@ import { colors, category, shadow } from "../theme";
 import { isSameDate, timeAgo, formatGregorianShort, MONTH_ABBR } from "../utils/date";
 import { WEEKDAY_LABELS, MONTH_NAMES, WALK_REMINDER_HOUR_OPTIONS, DEFAULT_WALK_REMINDER_HOUR } from "../data/constants";
 import { parseMinutes, minutesLabel } from "../utils/parse";
+import { numericOnly } from "../utils/numeric";
 import { confirmDelete } from "../utils/confirm";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
@@ -323,8 +324,9 @@ function ActivityScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, o
                     <TextInput
                       style={styles.goalInput}
                       value={goalText}
-                      onChangeText={setGoalText}
+                      onChangeText={(t) => setGoalText(numericOnly(t, { decimals: false }))}
                       keyboardType="number-pad"
+                      inputMode="numeric"
                       autoFocus
                       onSubmitEditing={saveGoal}
                       accessibilityLabel="เป้าหมายเดินรายวัน (นาที)"

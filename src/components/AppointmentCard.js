@@ -30,62 +30,75 @@ export default function AppointmentCard({ data, petName, onDelete, onEdit, onMar
 
   return (
     <Card style={[styles.apptCard, isDone && styles.doneCard]}>
-      <View style={[sharedStyles.iconWrap, { backgroundColor: category.appointments.soft }]}>
-        <TitleIcon size={20} color={category.appointments.main} strokeWidth={2} />
-      </View>
-      <View style={{ flex: 1, marginLeft: 14 }}>
-        <View style={styles.titleRow}>
-          <AppText style={styles.apptTitle}>{data.title}</AppText>
-          {isDone && <Badge variant="success" style={styles.dayBadge}>มาแล้ว</Badge>}
+      {/* แถวบน: ไอคอน + ข้อความ (flex:1) + วันเวลา — ไม่มีปุ่มแย่งพื้นที่ กันข้อความถูกบีบเหลือ 0 บนจอแคบ */}
+      <View style={styles.topRow}>
+        <View style={[sharedStyles.iconWrap, { backgroundColor: category.appointments.soft }]}>
+          <TitleIcon size={20} color={category.appointments.main} strokeWidth={2} />
         </View>
-        {petName ? <AppText style={styles.apptPet}>{petName}</AppText> : null}
-        <View style={styles.apptSubRow}>
-          <MapPin size={13} color={colors.textGray} strokeWidth={2} />
-          <AppText style={styles.apptSub}>{data.location}</AppText>
+        <View style={{ flex: 1, marginLeft: 14 }}>
+          <View style={styles.titleRow}>
+            <AppText style={styles.apptTitle}>{data.title}</AppText>
+            {isDone && <Badge variant="success" style={styles.dayBadge}>มาแล้ว</Badge>}
+          </View>
+          {petName ? <AppText style={styles.apptPet}>{petName}</AppText> : null}
+          {data.location ? (
+            <View style={styles.apptSubRow}>
+              <MapPin size={13} color={colors.textGray} strokeWidth={2} />
+              <AppText style={styles.apptSub}>{data.location}</AppText>
+            </View>
+          ) : null}
+        </View>
+        <View style={styles.dateCol}>
+          <AppText style={styles.apptDate}>{formatDate(data.dateObj)}</AppText>
+          <AppText style={styles.apptTime}>{data.time}</AppText>
+          {dayTag && !isDone && (
+            <Badge variant={dayTag === "วันนี้" ? "default" : "secondary"} style={styles.dayBadge} textStyle={styles.dayBadgeText}>
+              {dayTag}
+            </Badge>
+          )}
         </View>
       </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <AppText style={styles.apptDate}>{formatDate(data.dateObj)}</AppText>
-        <AppText style={styles.apptTime}>{data.time}</AppText>
-        {dayTag && !isDone && (
-          <Badge variant={dayTag === "วันนี้" ? "default" : "secondary"} style={styles.dayBadge} textStyle={styles.dayBadgeText}>
-            {dayTag}
-          </Badge>
-        )}
-      </View>
-      {onMarkDone && !isDone && (
-        <Pressable
-          onPress={onMarkDone}
-          accessibilityRole="button"
-          accessibilityLabel="ทำเครื่องหมายว่ามาแล้ว"
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.85 }]}
-        >
-          <Check size={13} color={colors.success} strokeWidth={2} />
-          <AppText style={styles.doneBtnText}>มาแล้ว</AppText>
-        </Pressable>
-      )}
-      {onEdit && !isDone && (
-        <IconButton
-          icon="edit-2"
-          color={colors.accentDeep}
-          onPress={onEdit}
-          style={{ marginLeft: 8 }}
-          accessibilityLabel={`แก้ไขนัดหมาย ${data.title}`}
-        />
-      )}
-      {onDelete && !isDone && (
-        <IconButton icon="trash-2" color={colors.red} onPress={onDelete} style={{ marginLeft: 8 }} accessibilityLabel={`ลบนัดหมาย ${data.title}`} />
-      )}
+
+      {/* แถวล่าง: ปุ่มทั้งหมดชิดขวา — แยกจากข้อความเพื่อไม่ให้จอแคบบีบข้อความ */}
+      {(onMarkDone && !isDone) || (onEdit && !isDone) || (onDelete && !isDone) ? (
+        <View style={styles.actionsRow}>
+          {onMarkDone && !isDone && (
+            <Pressable
+              onPress={onMarkDone}
+              accessibilityRole="button"
+              accessibilityLabel="ทำเครื่องหมายว่ามาแล้ว"
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={({ pressed }) => [styles.doneBtn, pressed && { opacity: 0.85 }]}
+            >
+              <Check size={13} color={colors.success} strokeWidth={2} />
+              <AppText style={styles.doneBtnText}>มาแล้ว</AppText>
+            </Pressable>
+          )}
+          {onEdit && !isDone && (
+            <IconButton
+              icon="edit-2"
+              color={colors.accentDeep}
+              onPress={onEdit}
+              accessibilityLabel={`แก้ไขนัดหมาย ${data.title}`}
+            />
+          )}
+          {onDelete && !isDone && (
+            <IconButton icon="trash-2" color={colors.red} onPress={onDelete} accessibilityLabel={`ลบนัดหมาย ${data.title}`} />
+          )}
+        </View>
+      ) : null}
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
-  apptCard: { flexDirection: "row", alignItems: "center", marginBottom: 14, paddingVertical: 14 },
+  apptCard: { marginBottom: 14, paddingVertical: 14, paddingHorizontal: 16 },
   doneCard: { opacity: 0.55 },
+  topRow: { flexDirection: "row", alignItems: "center" },
+  dateCol: { alignItems: "flex-end", marginLeft: 10 },
+  actionsRow: { flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: 8, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.trackBg },
   titleRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  apptTitle: { fontSize: 16, fontWeight: "600", color: colors.textDark },
+  apptTitle: { fontSize: 16, fontWeight: "600", color: colors.textDark, flexShrink: 1 },
   apptPet: { fontSize: 13, fontWeight: "600", color: colors.textGray, marginTop: 2 },
   apptSubRow: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 4 },
   apptSub: { fontSize: 13, fontWeight: "400", color: colors.textGray, flexShrink: 1 },
@@ -97,7 +110,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginLeft: 8,
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderRadius: 999,

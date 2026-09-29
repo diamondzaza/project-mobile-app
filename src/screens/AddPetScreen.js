@@ -14,6 +14,7 @@ import { sharedStyles } from "../theme/sharedStyles";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 import { confirmDialog } from "../utils/confirm";
+import { numericOnly } from "../utils/numeric";
 import { findBreedRange, BREED_DISCLAIMER } from "../data/breedRanges";
 
 
@@ -162,11 +163,12 @@ function AddPetScreen({ go, addPet, goSubscription }) {
                   label="น้ำหนักเริ่มต้น kg (ไม่บังคับ)"
                   value={weight}
                   onChangeText={(t) => {
-                    setWeight(t);
+                    setWeight(numericOnly(t));
                     setInlineError(null);
                   }}
                   placeholder="เช่น 5.8"
                   keyboardType="decimal-pad"
+                  inputMode="decimal"
                   error={Boolean(inlineError)}
                   errorText={inlineError}
                 />

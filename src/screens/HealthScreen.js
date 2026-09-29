@@ -15,6 +15,7 @@ import RealCalendar from "../calendar/RealCalendar";
 import { Card as ShadCard, CardHeader, CardTitle, CardContent, Badge, Switch } from "../components/ui";
 import { colors, radius, shadow } from "../theme";
 import { formatGregorian } from "../utils/date";
+import { numericOnly } from "../utils/numeric";
 import { sharedStyles } from "../theme/sharedStyles";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
@@ -278,9 +279,10 @@ function HealthScreen({ go, activePet, healthData, completeHealthItem, addHealth
                   <Field
                     label="ราคา (บาท)"
                     value={newPrice}
-                    onChangeText={setNewPrice}
+                    onChangeText={(t) => setNewPrice(numericOnly(t))}
                     placeholder="เช่น 350"
                     keyboardType="decimal-pad"
+                    inputMode="decimal"
                   />
                   <Field
                     label="บันทึกเพิ่มเติม"

@@ -15,6 +15,7 @@ import { colors } from "../theme";
 import { sharedStyles } from "../theme/sharedStyles";
 import { formatGregorian, formatGregorianShort } from "../utils/date";
 import { confirmDelete } from "../utils/confirm";
+import { numericOnly } from "../utils/numeric";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
 
@@ -135,8 +136,9 @@ function WeightScreen({ go, activePet, weightData, saveWeightEntry, removeWeight
                   placeholder="น้ำหนัก เช่น 5.8"
                   placeholderTextColor={colors.textGray}
                   keyboardType="decimal-pad"
+                  inputMode="decimal"
                   value={newWeight}
-                  onChangeText={setNewWeight}
+                  onChangeText={(t) => setNewWeight(numericOnly(t))}
                 />
               </View>
               <View style={{ flexDirection: "row", gap: 10 }}>

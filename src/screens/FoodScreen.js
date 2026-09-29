@@ -27,6 +27,7 @@ import { colors, shadow } from "../theme";
 import { isSameDate, timeAgo, formatGregorianShort } from "../utils/date";
 import { MEAL_REMINDERS, MEAL_REMINDER_HOUR_OPTIONS } from "../data/constants";
 import { parseGrams } from "../utils/parse";
+import { numericOnly } from "../utils/numeric";
 import { choosePhoto } from "../utils/photo";
 import AnimatedScrollView from "../components/AnimatedScrollView";
 import Reveal from "../components/Reveal";
@@ -291,8 +292,9 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
                     <TextInput
                       style={styles.goalInput}
                       value={goalText}
-                      onChangeText={setGoalText}
+                      onChangeText={(t) => setGoalText(numericOnly(t, { decimals: false }))}
                       keyboardType="number-pad"
+                      inputMode="numeric"
                       autoFocus
                       onSubmitEditing={saveGoal}
                     />
@@ -489,7 +491,8 @@ function FoodScreen({ go, activePet, items, onAdd, onEdit, onRemove, goal, onSet
           )}
 
 
-          <AppText style={styles.mealSelectTitle}>ช่วงเวลา</AppText>
+          {/* อยู่ระดับหน้า (นอกการ์ด) — ต้องมี padding ตรงแนวกับ section อื่น (20pt) */}
+          <AppText style={[styles.mealSelectTitle, { paddingHorizontal: 20 }]}>ช่วงเวลา</AppText>
           <View style={styles.chipsRow}>
             {PERIODS.map((p) => {
               const active = period === p.key;
@@ -626,6 +629,7 @@ const styles = StyleSheet.create({
   thumb: { width: 46, height: 46, borderRadius: 12 },
   summaryThumb: { width: 38, height: 38, borderRadius: 12 },
 
+  // ตรงแนวกับ section อื่นของหน้า (inputRow/การ์ด = 20pt) — ทุกชิปในหน้านี้อยู่ระดับ container ไม่ได้อยู่ในการ์ด
   chipsRow: { flexDirection: "row", paddingHorizontal: 20, marginTop: 12, gap: 8, flexWrap: "wrap" },
   chip: { paddingHorizontal: 14, paddingVertical: 11, borderRadius: 999 },
   chipInner: { flexDirection: "row", alignItems: "center", gap: 5 },
